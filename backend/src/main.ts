@@ -1,6 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { bootstrap } from './app'
 import { Logger } from '@nestjs/common'
+import('./configs/ftp.config.js')
 const logger = new Logger('NestApplication')
 bootstrap()
   .then(async (app: NestExpressApplication) => {
@@ -11,3 +12,5 @@ bootstrap()
   .catch((err) => {
     logger.error(err)
   })
+
+  
