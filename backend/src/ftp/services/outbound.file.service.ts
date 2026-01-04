@@ -1,12 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Parser } from 'json2csv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Client } from 'basic-ftp';
 import { CreateFileDto } from '../dto/outbound.file.dto';
+import { FtpClientService } from './ftpClient.service';
+import { COMMON_CONSTANT } from '../../common/common.constant'
+
+const { local_inboundDir, local_outboundDir, cra_remoteDir } = COMMON_CONSTANT
 
 @Injectable()
-export class FileTransferService {
+export class FtpOutboundService implements OnModuleInit {
+
+    constructor(private readonly ftpClientService: FtpClientService) { }
     async processAndUpload(dto: CreateFileDto) {
         const fileName = this.buildFileName(
             dto.system,
@@ -14,7 +20,7 @@ export class FileTransferService {
             dto.fileType,
         );
 
-        const localDir = path.join(process.cwd(), 'outbound');
+        const localDir = path.join(process.cwd(), local_outboundDir);
         if (!fs.existsSync(localDir)) {
             fs.mkdirSync(localDir);
         }
@@ -27,13 +33,14 @@ export class FileTransferService {
 
         // 2️⃣ Write CSV locally
         fs.writeFileSync(localFilePath, csvData);
-        
+
+
 
         // 3️⃣ Upload to FTP
         // await this.uploadToFtp(localFilePath, fileName);
-    //   await this.uploadToFtp(localFilePath, `/test/${fileName}`);
-
-
+        //   await this.uploadToFtp(localFilePath, `/test/${fileName}`);
+        let res = await this.ftpClientService.uploadFile(localFilePath, cra_remoteDir, fileName)
+        console.log('Result from ftp client', res)
 
         console.log('File uploded successfuly , fileName', fileName)
 
@@ -55,31 +62,18 @@ export class FileTransferService {
         return `${system}-${flow}-${fileType}-${timestamp}-${sequence}.csv`;
     }
 
-    private async uploadToFtp(localPath: string, fileName: string) {
-        const client = new Client();
+    onModuleInit() {
+        setInterval(async () => {
+            console.log('Checking file is availabel or not')
+            let result = await this.downloadFile()
+            console.log('Poling Result', result)
+            
+        }, 5000);
+    }
 
-        try {
-            await client.access({
-                host: process.env.FTP_HOST,
-                user: process.env.FTP_USER,
-                port: + process.env.FTP_PORT,
-                password: process.env.FTP_PASSWORD,
-                secure: true,
-                secureOptions: {
-                    rejectUnauthorized: false
-                }
-            });
 
-            await client.ensureDir('test')
-
-            let ftpResponse = await client.uploadFrom(localPath, fileName);
-            console.log('ftp Response', ftpResponse)
-        } catch (error) {
-            console.log('error============>', error)
-
-        } finally {
-            client.close();
-        }
-
+    async downloadFile() {
+        return this.ftpClientService.downloadFile(local_inboundDir, cra_remoteDir)
     }
 }
+

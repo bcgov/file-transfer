@@ -11,8 +11,9 @@ const ftpConfig = {
 
 for(let key in ftpConfig){
     if(!ftpConfig[key]){
-        console.log(`FTP Configuration: ${key} missing`)
+        console.log(`FTP CONFIG KEY : ${key} IS MISSING IN ENV`)
         // process.exit(1)
+        throw new Error(`FTP CONFIG KEY ${key} IS MISSING IN ENV `)
     }
     // console.log('Configuration Key is :', key)
 }

@@ -9,15 +9,14 @@ import { AppService } from './app.service'
 import { AppController } from './app.controller'
 import { MetricsController } from './metrics.controller'
 import { TerminusModule } from '@nestjs/terminus'
-import {FileTransferController} from './ftp/controllers/outbound.file.controller'
-import {FileTransferService} from './ftp/services/outbound.file.service'
+import { FtpModule } from './ftp/ftp.module'
 // import { HealthController } from './health.controller'
 
 @Module({
-  imports: [ConfigModule.forRoot(), TerminusModule],
+  imports: [ConfigModule.forRoot(), TerminusModule, FtpModule],
   // controllers: [AppController, MetricsController, HealthController],
-  controllers: [AppController, MetricsController, FileTransferController],
-  providers: [AppService, FileTransferService],
+  controllers: [AppController, MetricsController],
+  providers: [AppService],
 })
 export class AppModule {
   // let's add a middleware on all routes
