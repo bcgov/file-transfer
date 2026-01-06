@@ -1,8 +1,8 @@
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { bootstrap } from './app'
 import { Logger } from '@nestjs/common'
-import('./config/ftp.config.js')
-import('./config/server.config.js')
+import('./configs/ftp.config.js')
+import('./configs/server.config.js')
 const logger = new Logger('NestApplication')
 bootstrap()
   .then(async (app: NestExpressApplication) => {
