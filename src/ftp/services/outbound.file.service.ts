@@ -41,8 +41,10 @@ export class FtpOutboundService implements OnModuleInit {
         // 3️⃣ Upload to FTP
         // await this.uploadToFtp(localFilePath, fileName);
         //   await this.uploadToFtp(localFilePath, `/test/${fileName}`);
+
+        console.log(`Uploading file from ${localFilePath} to FTP server... at Path============>${cra_remoteDir}/${fileName}`);
         let res = await this.ftpClientService.uploadFile(localFilePath, cra_remoteDir, fileName)
-        console.log('Result from ftp client', res)
+        console.log('Response from ftp server', res)
 
         console.log('File uploded successfuly , fileName', fileName)
 

@@ -66,16 +66,17 @@ export class FtpClientService {
         if (!fs.existsSync(localDir)) {
             fs.mkdirSync(localDir)
         }
-
         const files = await client.list(cra_remoteDir)
         for (const file of files) {
             console.log('File from ftp', file)
+            console.log('Local Dir for download=========------->', cra_remoteDir,file.name, localDir)
             if(file.isDirectory || file.name.split('.').pop()==='tmp') continue
             const localFilePath = path.join(localDir, file.name)
             const remoteFilePath = `${cra_remoteDir}/${file.name}`
-            const processedPath = `${cra_remoteDir}/processed/${file.name}`
+            // const processedPath = `${cra_remoteDir}/processed/${file.name}`
+            const processedPath = `${cra_remoteDir}/${file.name}`
             let result = await client.downloadTo(localFilePath, remoteFilePath)
-            await client.ensureDir(`${cra_remoteDir}/processed`)
+            // await client.ensureDir(`${cra_remoteDir}/processed`)
             let moveResult = await client.rename(remoteFilePath, processedPath)
             console.log('download Result', result, file.name, 'move REsult', moveResult)
         }

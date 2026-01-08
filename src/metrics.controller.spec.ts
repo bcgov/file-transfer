@@ -5,7 +5,7 @@ import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
 // Mock the prom middleware
-vi.mock('src/middleware/prom', () => {
+vi.mock('./middleware/prom.js', () => {
   const mockRegister = {
     metrics: vi.fn(),
   }
