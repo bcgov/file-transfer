@@ -6,8 +6,9 @@ import { Client } from 'basic-ftp';
 import { CreateFileDto } from '../dto/outbound.file.dto';
 import { FtpClientService } from './ftpClient.service';
 import { COMMON_CONSTANT } from '../../common/common.constant'
+import { Multer } from 'multer';
 
-const { local_inboundDir, local_outboundDir, cra_remoteDir } = COMMON_CONSTANT
+const { local_inboundDir, local_outboundDir, cra_remoteDir, csa_remoteDir } = COMMON_CONSTANT
 
 @Injectable()
 export class FtpOutboundService implements OnModuleInit {
@@ -74,10 +75,25 @@ export class FtpOutboundService implements OnModuleInit {
             
         // }, 5000);
     }
+    
+    async uploadFileToCra (file: Multer.File, userId:string, serviceName:string){
 
+        console.log('uploadFileToCra service called', file, userId, serviceName)
+
+        let localFilePath = path.join(local_outboundDir,'temp', file.originalname)
+
+        fs.mkdirSync(path.dirname(localFilePath), { recursive: true });
+        fs.writeFileSync(localFilePath, file.buffer);
+
+        await this.ftpClientService.uploadFile(localFilePath, cra_remoteDir, file.originalname)
+        fs.unlinkSync(localFilePath);
+
+        return { statusCode: 200, message: 'File uploded successfuly', file: file.originalname  }
+
+    }
 
     async downloadFile() {
-        return this.ftpClientService.downloadFile(local_inboundDir, cra_remoteDir)
+        return this.ftpClientService.downloadFile(local_inboundDir, csa_remoteDir)
     }
 }
 

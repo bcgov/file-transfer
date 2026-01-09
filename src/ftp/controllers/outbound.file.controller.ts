@@ -3,12 +3,18 @@ import {
   Controller,
   Post,
   Get,
+  Headers,
   HttpStatus,
   HttpException,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException
 } from '@nestjs/common';
 import { FtpOutboundService } from '../services/outbound.file.service';
 import { CreateFileDto } from '../dto/outbound.file.dto';
 import { Logger } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { File as MulterFile } from 'multer';
 
 @Controller('file')
 export class FtpOutboundController {
@@ -36,8 +42,32 @@ export class FtpOutboundController {
     }
   }
 
+  @Post('upload-to-cta')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadfiletoCra(
+    @UploadedFile() file: MulterFile,
+    @Headers('servicename') serviceName: string,
+    @Headers('userid') userId: string
+  ) {
+    console.log('File to upload to cra', file, serviceName, userId)
+
+        if (!file) {
+      throw new BadRequestException('File is required');
+    }
+    if (!serviceName || !userId) {
+      throw new BadRequestException(
+        'servicename and userid are required in headers',
+      );
+    }
+
+  return  await this.FtpOutboundService.uploadFileToCra(file, userId, serviceName)
+
+   
+
+  }
+
   @Get('download')
-  async downloadFile(){
+  async downloadFile() {
     return this.FtpOutboundService.downloadFile()
   }
 
