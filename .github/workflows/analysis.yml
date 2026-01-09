@@ -53,7 +53,7 @@ jobs:
             -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
           sonar_token: ${{ env.SONAR_TOKEN }}
           supply_scan: true
-          triggers: ('src/')
+          triggers: 'src/'
 
   # frontend-tests:
   #   name: Frontend Tests
