@@ -4,13 +4,13 @@ on:
   push:
     branches: [dev, test, main]
     paths:
-      - "src/**"
-      - "test/**"
-      - "tests/**"
-      - "package.json"
-      - "package-lock.json"
-      - "Dockerfile"
-      - ".github/workflows/**"
+      - 'src/**'
+      - 'test/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Dockerfile'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 concurrency:
@@ -118,9 +118,8 @@ jobs:
   update-gitops:
     needs: [detect-changes, build-file-transfer]
     if: >-
-      always() &&
-      needs.detect-changes.outputs.app == 'true' &&
-      needs.build-file-transfer.result == 'success'
+      always() && needs.detect-changes.outputs.app == 'true' && needs.build-file-transfer.result ==
+      'success'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout GitOps repo

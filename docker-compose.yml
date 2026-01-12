@@ -13,7 +13,6 @@ x-postgres-vars: &postgres-vars
   POSTGRES_DATABASE: *POSTGRES_DATABASE
 
 services:
-
   backend:
     container_name: backend
     depends_on:
@@ -24,9 +23,8 @@ services:
       <<: *postgres-vars
       NODE_ENV: development
     image: *node-image
-    ports: ["3001:3000"]
+    ports: ['3001:3000']
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api"]
-    working_dir: "/app"
-    volumes: ["./backend:/app", "/app/node_modules"]
-
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api']
+    working_dir: '/app'
+    volumes: ['./backend:/app', '/app/node_modules']

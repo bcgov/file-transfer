@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment (updates the matching overlay in the GitOps repo)"
+        description: 'Target environment (updates the matching overlay in the GitOps repo)'
         type: choice
         required: true
         options: [dev, test, prod]
       tag:
-        description: "Image tag to promote (e.g. dev-abc1234, v1.2.3)"
+        description: 'Image tag to promote (e.g. dev-abc1234, v1.2.3)'
         type: string
         required: true
 
@@ -147,8 +147,10 @@ jobs:
           base: ${{ env.GITOPS_BASE_BRANCH }}
           branch: ${{ steps.vars.outputs.branch }}
           delete-branch: true
-          commit-message: "Promote file-transfer to ${{ steps.vars.outputs.env }}: ${{ steps.vars.outputs.tag }}"
-          title: "Promote file-transfer to ${{ steps.vars.outputs.env }}: ${{ steps.vars.outputs.tag }}"
+          commit-message:
+            'Promote file-transfer to ${{ steps.vars.outputs.env }}: ${{ steps.vars.outputs.tag }}'
+          title:
+            'Promote file-transfer to ${{ steps.vars.outputs.env }}: ${{ steps.vars.outputs.tag }}'
           body: |
             This PR promotes an existing image tag to the GitOps overlays.
 

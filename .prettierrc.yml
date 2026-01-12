@@ -27,4 +27,3 @@ printWidth: 100
 
 # Arrow function parentheses
 arrowParens: 'always'
-

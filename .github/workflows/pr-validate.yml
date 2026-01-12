@@ -6,15 +6,15 @@ on:
     branches: [dev, test, main]
     paths:
       # App source at repo root
-      - "src/**"
-      - "test/**"
-      - "tests/**"
-      - "package.json"
-      - "package-lock.json"
-      - "Dockerfile"
+      - 'src/**'
+      - 'test/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Dockerfile'
 
       # Workflow changes must always validate
-      - ".github/workflows/**"
+      - '.github/workflows/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}

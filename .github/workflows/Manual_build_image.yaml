@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch or SHA to build (e.g. feature/my-branch, dev, commit SHA)"
+        description: 'Branch or SHA to build (e.g. feature/my-branch, dev, commit SHA)'
         required: true
         type: string
       image_name:
-        description: "GHCR image name (default: file-transfer)"
+        description: 'GHCR image name (default: file-transfer)'
         required: true
         type: string
-        default: "file-transfer"
+        default: 'file-transfer'
 
 concurrency:
   group: build-image-manual-${{ inputs.ref }}-${{ inputs.image_name }}
