@@ -58,6 +58,7 @@ COPY --from=build /app/dist ./dist
 # Only copy if it exists in your repo/output
 COPY --from=build /app/generated ./generated
 
+USER nonroot
 # Distroless entrypoint is node; CMD is node arguments.
 # Adjust path to your real Nest output:
 # - common: /app/dist/main.js
