@@ -7,16 +7,13 @@
 # - Distroless-compatible (no curl/shell, no Docker HEALTHCHECK)
 # - Run as non-root
 
-ARG NODE_VERSION=22
+ARG NODE_VERSION=24
 
 # ----------------------------
 # 1) Dependencies stage (prod deps only)
 # ----------------------------
 FROM node:${NODE_VERSION}-slim AS deps
 WORKDIR /app
-
-# Only keep if you actually use Prisma
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
 
 # Cache-friendly: copy lockfiles first
 COPY package.json package-lock.json ./
@@ -29,7 +26,6 @@ RUN npm ci --no-update-notifier --omit=dev
 # ----------------------------
 FROM node:${NODE_VERSION}-slim AS build
 WORKDIR /app
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
 
 COPY package.json package-lock.json ./
 RUN npm ci --no-update-notifier
@@ -40,9 +36,6 @@ COPY . ./
 # Prefer explicit build
 # If your repo truly needs `npm run deploy`, swap this back.
 RUN npm run build
-
-# Optional: if Prisma generate is required at build time, do it explicitly
-# RUN npx prisma generate
 
 # ----------------------------
 # 3) Runtime stage (distroless)
