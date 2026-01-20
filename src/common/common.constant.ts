@@ -7,4 +7,5 @@ export const COMMON_CONSTANT = {
     DELIVERED: 'DELIVERED',
     FAILED: 'FAILED',
   },
+  DESTINATION_ID: ['cra-ftp'],
 }

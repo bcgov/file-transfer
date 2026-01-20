@@ -11,6 +11,7 @@ vi.mock('fs', () => ({
   mkdirSync: vi.fn(),
   writeFileSync: vi.fn(),
   renameSync: vi.fn(),
+  unlinkSync: vi.fn(),
 }))
 
 describe('FtpOutboundService', () => {
@@ -66,7 +67,10 @@ describe('FtpOutboundService', () => {
 
     it('should throw error when FTP upload fails', async () => {
       // Arrange
-      ;(fs.existsSync as any).mockReturnValue(true)
+      ;(fs.existsSync as any)
+        .mockReturnValueOnce(true) // tempDir exists
+        .mockReturnValueOnce(true) // sentDir exists
+        .mockReturnValueOnce(false) // sentFilePath DOES NOT exist (IMPORTANT)
 
       mockFtpClientService.uploadFile.mockResolvedValue({
         code: 550,
@@ -81,6 +85,8 @@ describe('FtpOutboundService', () => {
           fileName: 'test.txt',
         }),
       ).rejects.toThrow('Failed to upload file to CRA FTP server: Permission denied')
+
+      expect(mockFtpClientService.uploadFile).toHaveBeenCalledOnce()
     })
   })
 

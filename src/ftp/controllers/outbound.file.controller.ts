@@ -16,6 +16,9 @@ import { FileInterceptor } from '@nestjs/platform-express'
 import { File as MulterFile } from 'multer'
 import { ApiTags, ApiBody, ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger'
 import { OutboundUploadResponseDto } from '../dto/outbound.response.dto'
+import { COMMON_CONSTANT } from '../../common/common.constant'
+
+const { DESTINATION_ID } = COMMON_CONSTANT
 
 @ApiTags('FTP')
 @Controller('v1')
@@ -59,6 +62,9 @@ export class FtpOutboundController {
         this.logger.log('Missing destinationId or fileName in the request body')
         throw new BadRequestException('destinationId and fileName are required in the body')
       }
+      if (!DESTINATION_ID.includes(destinationId)) {
+        throw new BadRequestException(`destinationId is invalid use one of [${DESTINATION_ID}] it `)
+      }
 
       return await this.FtpOutboundService.uploadFileToCra({ file, destinationId, fileName })
     } catch (error) {
@@ -66,10 +72,10 @@ export class FtpOutboundController {
       throw new HttpException(
         {
           status: 'FAILED',
-          statusCode: error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+          statusCode: error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
           message: error?.message,
         },
-        error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+        error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
       )
     }
   }

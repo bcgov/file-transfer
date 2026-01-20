@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, ConflictException } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
 import { FtpClientService } from './ftp-client.service'
@@ -31,9 +31,17 @@ export class FtpOutboundService {
       }
     })
     const tempFilePath = path.join(tempDirPath, file.originalname)
+    const sentFilePath = path.join(sentDirPath, file.originalname)
 
     // fs.mkdirSync(path.dirname(localFilePath), { recursive: true })
     fs.writeFileSync(tempFilePath, file.buffer)
+    if (fs.existsSync(sentFilePath)) {
+      this.logger.log(`Temporary file created at ${tempFilePath}`)
+      throw new ConflictException(
+        `File ${file.originalname} has already been sent. Duplicate files are not allowed.`,
+      )
+      // return { status: RESPONSE_STATUS.FAILED, statusCode: 409, message: `File ${file.originalname} has already been sent. Duplicate files are not allowed.` }
+    }
 
     const craFtpResponse = await this.ftpClientService.uploadFile(
       tempFilePath,
@@ -50,6 +58,7 @@ export class FtpOutboundService {
         fileName: file.originalname,
       }
     } else {
+      fs.unlinkSync(tempFilePath) // delete temp file on failure
       throw new Error(`Failed to upload file to CRA FTP server: ${craFtpResponse?.message}`)
     }
   }
