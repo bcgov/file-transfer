@@ -1,19 +1,11 @@
-import { IsArray, IsNotEmpty, IsString } from 'class-validator'
+import { IsNotEmpty, IsString } from 'class-validator'
 
 export class CreateFileDto {
   @IsString()
   @IsNotEmpty()
-  system: string
+  fileName: string
 
   @IsString()
   @IsNotEmpty()
-  flow: string
-
-  @IsString()
-  @IsNotEmpty()
-  fileType: string
-
-  @IsArray()
-  @IsNotEmpty()
-  payload: any[]
+  destinationId: string
 }
