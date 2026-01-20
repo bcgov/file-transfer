@@ -25,10 +25,10 @@ export async function bootstrap() {
     prefix: 'v',
   })
   const config = new DocumentBuilder()
-    .setTitle('Users example')
-    .setDescription('The user API description')
+    .setTitle('File Transfer API')
+    .setDescription('Ftp File Transfer API documentation')
     .setVersion('1.0')
-    .addTag('users')
+    .addTag('FTP')
     .build()
 
   const document = SwaggerModule.createDocument(app, config)
