@@ -2,7 +2,8 @@
 
 # Description
 
-Please provide a summary of the change and the issue fixed. Please include relevant context. List dependency changes.
+Please provide a summary of the change and the issue fixed. Please include relevant context. List
+dependency changes.
 
 Fixes # (issue)
 
@@ -12,7 +13,8 @@ Fixes # (issue)
 
 - [ ] Bug fix (non-breaking change which fixes an issue)
 - [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as
+      expected)
 - [ ] This change requires a documentation update
 - [ ] Documentation update
 
@@ -31,7 +33,6 @@ Fixes # (issue)
 - [ ] Manual tests (description below)
 - [ ] Updated existing tests
 
-
 ## Checklist
 
 <!-- Go over all the following points, and put an `x` in all the boxes that apply. -->
@@ -45,7 +46,6 @@ Fixes # (issue)
 - [x] I have added tests that prove my fix is effective or that my feature works
 - [x] New and existing unit tests pass locally with my changes
 - [x] Any dependent changes have already been accepted and merged
-
 
 ## Further comments
 

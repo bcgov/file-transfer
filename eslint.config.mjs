@@ -1,7 +1,7 @@
-import eslint from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import prettier from 'eslint-plugin-prettier';
-import prettierConfig from 'eslint-config-prettier';
+import eslint from '@eslint/js'
+import tseslint from 'typescript-eslint'
+import prettier from 'eslint-plugin-prettier'
+import prettierConfig from 'eslint-config-prettier'
 
 /**
  * Shared ignore patterns (inlined from eslint-base.config.mjs)
@@ -16,7 +16,7 @@ const baseIgnores = [
   '**/dist/**',
   '**/node_modules/**',
   '**/coverage/**',
-];
+]
 
 /**
  * Shared ESLint rules (inlined from eslint-base.config.mjs)
@@ -40,7 +40,7 @@ const baseRules = {
   '@typescript-eslint/no-empty-interface': 'off',
   '@typescript-eslint/ban-types': 'off',
   '@typescript-eslint/explicit-function-return-type': 'off',
-};
+}
 
 export default tseslint.config(
   eslint.configs.recommended,
@@ -57,5 +57,4 @@ export default tseslint.config(
       // Additional backend-specific rules can be added here
     },
   },
-);
-
+)

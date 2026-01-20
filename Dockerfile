@@ -1,35 +1,59 @@
-# Build
-FROM node:24.11.1-slim AS build
+# syntax=docker/dockerfile:1
+#
+# Goals:
+# - Deterministic builds (npm ci)
+# - Better layer caching (copy lockfiles first)
+# - Node version consistency (build + runtime)
+# - Distroless-compatible (no curl/shell, no Docker HEALTHCHECK)
+# - Run as non-root
 
-# Copy, build static files; see .dockerignore for exclusions
+ARG NODE_VERSION=24
+
+# ----------------------------
+# 1) Dependencies stage (prod deps only)
+# ----------------------------
+FROM node:${NODE_VERSION}-slim AS deps
 WORKDIR /app
-COPY . ./
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
-RUN npm run deploy
 
-# Dependencies
-FROM node:24.11.1-slim AS dependencies
+# Cache-friendly: copy lockfiles first
+COPY package.json package-lock.json ./
 
-# Copy, build static files; see .dockerignore for exclusions
+# Prod deps only (smaller runtime)
+RUN npm ci --no-update-notifier --omit=dev
+
+# ----------------------------
+# 2) Build stage (full deps + compile)
+# ----------------------------
+FROM node:${NODE_VERSION}-slim AS build
 WORKDIR /app
-COPY . ./
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
-RUN npm ci --ignore-scripts --no-update-notifier --omit=dev
 
-# Deploy using minimal Distroless image
+COPY package.json package-lock.json ./
+RUN npm ci --no-update-notifier
+
+# Copy source after deps to maximize cache hits
+COPY . ./
+
+# Prefer explicit build
+# If your repo truly needs `npm run deploy`, swap this back.
+RUN npm run build
+
+# ----------------------------
+# 3) Runtime stage (distroless)
+# ----------------------------
 FROM gcr.io/distroless/nodejs22-debian12:nonroot
+
 ENV NODE_ENV=production
-
-# Copy app and dependencies
 WORKDIR /app
-COPY --from=dependencies /app/node_modules ./node_modules
-COPY --from=build /app/generated ./generated
+
+# Copy prod node_modules + build output only
+COPY --from=deps  /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+# Only copy if it exists in your repo/output
+COPY --from=build /app/generated ./generated
 
-# Boilerplate, not used in OpenShift/Kubernetes
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3000/api
-
-# Nonroot user, limit heap size to 50 MB
 USER nonroot
-CMD ["--max-old-space-size=50", "/app/dist/main"]
+# Distroless entrypoint is node; CMD is node arguments.
+# Adjust path to your real Nest output:
+# - common: /app/dist/main.js
+# - sometimes: /app/dist/api/main.js
+CMD ["--max-old-space-size=50", "/app/dist/main.js"]

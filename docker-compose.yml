@@ -1,19 +1,4 @@
-# Reusable vars
-x-var:
-  - &POSTGRES_USER postgres
-  - &POSTGRES_PASSWORD default
-  - &POSTGRES_DATABASE postgres
-  - &node-image node:22
-
-# Reusable envars for postgres
-x-postgres-vars: &postgres-vars
-  POSTGRES_HOST: database
-  POSTGRES_USER: *POSTGRES_USER
-  POSTGRES_PASSWORD: *POSTGRES_PASSWORD
-  POSTGRES_DATABASE: *POSTGRES_DATABASE
-
 services:
-
   backend:
     container_name: backend
     depends_on:
@@ -21,12 +6,10 @@ services:
         condition: service_started
     entrypoint: sh -c "npm i && npm run start:dev"
     environment:
-      <<: *postgres-vars
       NODE_ENV: development
     image: *node-image
-    ports: ["3001:3000"]
+    ports: ['3001:3000']
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api"]
-    working_dir: "/app"
-    volumes: ["./backend:/app", "/app/node_modules"]
-
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api']
+    working_dir: '/app'
+    volumes: ['./backend:/app', '/app/node_modules']
