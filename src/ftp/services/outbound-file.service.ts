@@ -1,4 +1,4 @@
-import { Injectable, Logger, ConflictException } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
 import { FtpClientService } from './ftp-client.service'
@@ -18,7 +18,7 @@ const {
 export class FtpOutboundService {
   private readonly logger = new Logger(FtpOutboundService.name)
 
-  constructor(private readonly ftpClientService: FtpClientService) { }
+  constructor(private readonly ftpClientService: FtpClientService) {}
 
   async uploadFileToCra(request: UploadFileInterface) {
     const { file, destinationId, fileName } = request
@@ -30,12 +30,12 @@ export class FtpOutboundService {
     const tempDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.temp)
     const sentDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.outbound)
 
-      // Ensure directories exist
-      ;[tempDirPath, sentDirPath].forEach((dir) => {
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true })
-        }
-      })
+    // Ensure directories exist
+    ;[tempDirPath, sentDirPath].forEach((dir) => {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+    })
     const tempFilePath = path.join(tempDirPath, file.originalname)
     const sentFilePath = path.join(sentDirPath, file.originalname)
 
@@ -48,7 +48,7 @@ export class FtpOutboundService {
         status: RESPONSE_STATUS.DELIVERED,
         message: 'File already uploded to the destination server',
         fileName: file.originalname,
-        destinationId: destinationId
+        destinationId: destinationId,
       }
       // return { status: RESPONSE_STATUS.FAILED, statusCode: 409, message: `File ${file.originalname} has already been sent. Duplicate files are not allowed.` }
     }
@@ -66,7 +66,7 @@ export class FtpOutboundService {
         status: RESPONSE_STATUS.DELIVERED,
         message: craFtpResponse?.message,
         fileName: file.originalname,
-        destinationId: destinationId
+        destinationId: destinationId,
       }
     } else {
       fs.unlinkSync(tempFilePath) // delete temp file on failure
