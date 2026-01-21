@@ -24,82 +24,8 @@ jobs:
   changes:
     name: Detect Changes
     runs-on: ubuntu-24.04
-<<<<<<< HEAD
-    timeout-minutes: 5
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: default
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-    steps:
-      - uses: bcgov/action-test-and-analyse@c20d16c26d9b7e6e486f01702880053ed4ebdc91 # v1.5.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_BACKEND }}
-        with:
-          commands: |
-            npm ci
-            npm run lint
-           # npm run test:cov
-          dir: src
-          node_version: "22"
-          sonar_args: >
-            -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts
-            -Dsonar.organization=bcgov-sonarcloud
-            -Dsonar.projectKey=quickstart-openshift_backend
-            -Dsonar.sources=src
-            -Dsonar.tests.inclusions=**/*spec.ts
-            -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
-          sonar_token: ${{ env.SONAR_TOKEN }}
-          supply_scan: true
-          triggers: 'src/'
-
-  # frontend-tests:
-  #   name: Frontend Tests
-  #   if: (! github.event.pull_request.draft)
-  #   runs-on: ubuntu-24.04
-  #   timeout-minutes: 5
-  #   steps:
-  #     - uses: bcgov/action-test-and-analyse@c20d16c26d9b7e6e486f01702880053ed4ebdc91 # v1.5.0
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_FRONTEND }}
-  #       with:
-  #         commands: |
-  #           npm ci
-  #           npm run lint
-  #           npm run test:cov
-  #         dir: frontend
-  #         node_version: "22"
-  #         sonar_args: >
-  #           -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts
-  #           -Dsonar.organization=bcgov-sonarcloud
-  #           -Dsonar.projectKey=quickstart-openshift_frontend
-  #           -Dsonar.sources=src
-  #           -Dsonar.tests.inclusions=**/*spec.ts
-  #           -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
-  #         sonar_token: ${{ env.SONAR_TOKEN }}
-  #         supply_scan: true
-  #         triggers: ('frontend/')
-
-  # https://github.com/marketplace/actions/aqua-security-trivy
-  trivy:
-    name: Trivy Security Scan
-    if: (! github.event.pull_request.draft)
-    continue-on-error: true
-    permissions:
-      security-events: write
-    runs-on: ubuntu-24.04
-    timeout-minutes: 1
-=======
     outputs:
       app: ${{ steps.filter.outputs.app }}
->>>>>>> d048ccfb416761556a6f450bc1903a092b81ad21
     steps:
       - uses: actions/checkout@v6
       - id: filter
@@ -176,14 +102,8 @@ jobs:
   # ----------------------------
   results:
     name: Analysis Results
-<<<<<<< HEAD
-  #  needs: [backend-tests, frontend-tests]
-    needs: [backend-tests]
-    if: (! github.event.pull_request.draft)
-=======
     if: always()
     needs: [changes, app-tests, trivy]
->>>>>>> d048ccfb416761556a6f450bc1903a092b81ad21
     runs-on: ubuntu-24.04
     steps:
       - name: Gate on failures only (skipped is OK)
