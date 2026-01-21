@@ -48,6 +48,7 @@ export class FtpOutboundService {
         status: RESPONSE_STATUS.DELIVERED,
         message: 'File already uploded to the destination server',
         fileName: file.originalname,
+        destinationId: destinationId
       }
       // return { status: RESPONSE_STATUS.FAILED, statusCode: 409, message: `File ${file.originalname} has already been sent. Duplicate files are not allowed.` }
     }
@@ -65,6 +66,7 @@ export class FtpOutboundService {
         status: RESPONSE_STATUS.DELIVERED,
         message: craFtpResponse?.message,
         fileName: file.originalname,
+        destinationId: destinationId
       }
     } else {
       fs.unlinkSync(tempFilePath) // delete temp file on failure
