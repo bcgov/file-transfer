@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Client } from 'basic-ftp'
-// import { ConfigService } from '@nestjs/config'
 import path from 'path'
 import fs from 'fs'
 
@@ -39,7 +38,7 @@ export class FtpClientService {
     const finalPath = `${remoteDir}/${remoteFileName}`
 
     const result = await client.uploadFrom(localFilePath, tempPath)
-    console.log('File Upload Response', result)
+    // console.log('File Upload Response', result)
     await client.rename(tempPath, finalPath)
     this.logger.log(`Uploded FileName: ${remoteFileName}`)
     return result

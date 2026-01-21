@@ -2,13 +2,13 @@ import { Injectable, OnModuleInit } from '@nestjs/common'
 import { Parser } from 'json2csv'
 import * as fs from 'fs'
 import * as path from 'path'
-// import { Client } from 'basic-ftp'
 import { CreateFileDto } from '../dto/outbound.file.dto'
-import { FtpClientService } from './ftpClient.service'
+import { FtpClientService } from './ftp-client.service'
 import { COMMON_CONSTANT } from '../../common/common.constant'
-import { Multer } from 'multer'
+import { UploadFileInterface } from '../interfaces/outbound.interface'
 
-const { local_inboundDir, local_outboundDir, cra_remoteDir, csa_remoteDir } = COMMON_CONSTANT
+const { local_inboundDir, local_outboundDir, cra_remoteDir, csa_remoteDir, RESPONSE_STATUS } =
+  COMMON_CONSTANT
 
 @Injectable()
 export class FtpOutboundService implements OnModuleInit {
@@ -66,7 +66,9 @@ export class FtpOutboundService implements OnModuleInit {
     // }, 5000);
   }
 
-  async uploadFileToCra(file: Multer.File, userId: string, serviceName: string) {
+  async uploadFileToCra(request: UploadFileInterface) {
+    const { file, headers } = request
+    const { servicename: serviceName, userid: userId } = headers
     console.log('uploadFileToCra service called', file, userId, serviceName)
 
     const localFilePath = path.join(local_outboundDir, 'temp', file.originalname)
@@ -74,10 +76,23 @@ export class FtpOutboundService implements OnModuleInit {
     fs.mkdirSync(path.dirname(localFilePath), { recursive: true })
     fs.writeFileSync(localFilePath, file.buffer)
 
-    await this.ftpClientService.uploadFile(localFilePath, cra_remoteDir, file.originalname)
-    fs.unlinkSync(localFilePath)
-
-    return { statusCode: 200, message: 'File uploded successfuly', file: file.originalname }
+    const craFtpResponse = await this.ftpClientService.uploadFile(
+      localFilePath,
+      cra_remoteDir,
+      file.originalname,
+    )
+    // fs.unlinkSync(localFilePath);
+    console.log('CRA FTP Response', craFtpResponse)
+    if (craFtpResponse?.code === 226) {
+      return {
+        statusCode: craFtpResponse?.code,
+        status: RESPONSE_STATUS.DELIVERED,
+        message: craFtpResponse?.message,
+        fileName: file.originalname,
+      }
+    } else {
+      throw new Error(`Failed to upload file to CRA FTP server: ${craFtpResponse?.message}`)
+    }
   }
 
   async downloadFile() {

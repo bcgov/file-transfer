@@ -15,8 +15,19 @@ import { CreateFileDto } from '../dto/outbound.file.dto'
 import { Logger } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { File as MulterFile } from 'multer'
+import { UploadFileHeaders } from '../interfaces/outbound.interface'
+import {
+  ApiTags,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiHeader,
+  ApiResponse,
+} from '@nestjs/swagger'
+import { OutboundUploadResponseDto } from '../dto/outbound.response.dto'
 
-@Controller('file')
+@ApiTags('FTP')
+@Controller()
 export class FtpOutboundController {
   private readonly logger = new Logger(FtpOutboundController.name)
   constructor(private readonly FtpOutboundService: FtpOutboundService) {}
@@ -42,23 +53,65 @@ export class FtpOutboundController {
     }
   }
 
-  @Post('upload-to-cta')
+  @Post('transfers')
+  @ApiOperation({ summary: 'Upload file to FTP Server' })
+  @ApiConsumes('multipart/form-data')
+  @ApiHeader({
+    name: 'servicename',
+    description: 'Service Identifier (e.g., csa-backendservice)',
+    required: true,
+    example: 'csa-backendservice',
+  })
+  @ApiHeader({
+    name: 'userid',
+    description: 'User Identifier (e.g., testuser)',
+    required: true,
+    example: 'testuser',
+  })
+  @ApiBody({
+    description: 'Upload a .txt file only',
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Text file (.txt only)',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'File uploaded successfully',
+    type: OutboundUploadResponseDto,
+  })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadfiletoCra(
-    @UploadedFile() file: MulterFile,
-    @Headers('servicename') serviceName: string,
-    @Headers('userid') userId: string,
-  ) {
-    console.log('File to upload to cra', file, serviceName, userId)
+  async uploadfiletoCra(@UploadedFile() file: MulterFile, @Headers() headers: UploadFileHeaders) {
+    console.log('File to upload to cra', file, headers)
+    try {
+      if (!file) {
+        throw new BadRequestException('File is required')
+      }
+      // if (!headers.servicename || !headers.userid) {
+      //   throw new BadRequestException(
+      //     'servicename and userid are required in headers',
+      //   );
+      // }
 
-    if (!file) {
-      throw new BadRequestException('File is required')
+      return await this.FtpOutboundService.uploadFileToCra({ file, headers })
+    } catch (error) {
+      console.log('Error in uploadfiletoCra controller', error)
+      throw new HttpException(
+        {
+          status: 'FAILED',
+          message: error.message,
+          statusCode: error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      )
     }
-    if (!serviceName || !userId) {
-      throw new BadRequestException('servicename and userid are required in headers')
-    }
-
-    return await this.FtpOutboundService.uploadFileToCra(file, userId, serviceName)
   }
 
   @Get('download')
