@@ -1,11 +1,7 @@
 import { File as MulterFile } from 'multer'
 
-export interface UploadFileHeaders {
-  servicename: string
-  userid: string
-}
-
 export interface UploadFileInterface {
-  headers: UploadFileHeaders
+  destinationId: string
+  fileName: string
   file: MulterFile
 }

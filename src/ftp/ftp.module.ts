@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { FtpOutboundService } from './services/outbound.file.service'
+import { FtpOutboundService } from './services/outbound-file.service'
 import { FtpOutboundController } from './controllers/outbound.file.controller'
 import { FtpClientService } from './services/ftp-client.service'
 
