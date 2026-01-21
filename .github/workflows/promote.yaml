@@ -222,6 +222,7 @@ jobs:
           if [[ "$ENV" == "dev" ]]; then
             git add .
             git commit -m "Promote to dev: ${REPO_SAFE} ${TAG}"
+            git remote set-url origin "https://x-access-token:${{ secrets.GITOPS_PUSH_TOKEN }}@github.com/${{ env.GITOPS_REPO }}.git"
             git push origin "${{ env.GITOPS_BASE_BRANCH }}"
             echo "Pushed dev promotion directly to GitOps main."
             exit 0
@@ -230,5 +231,6 @@ jobs:
           git checkout -b "$BR"
           git add .
           git commit -m "Promote to ${ENV}: ${REPO_SAFE} ${TAG}"
+          git remote set-url origin "https://x-access-token:${{ secrets.GITOPS_PUSH_TOKEN }}@github.com/${{ env.GITOPS_REPO }}.git"
           git push -u origin "$BR"
           echo "Created branch $BR in GitOps repo. Open a PR to ${GITOPS_BASE_BRANCH}."
