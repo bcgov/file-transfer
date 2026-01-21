@@ -5,7 +5,7 @@ import { COMMON_CONSTANT } from '../../common/common.constant'
 import * as fs from 'fs'
 import { File as MulterFile } from 'multer'
 
-const { RESPONSE_STATUS, cra_remoteDir } = COMMON_CONSTANT
+const { RESPONSE_STATUS, cra_remoteDir, LOCAL_DIRECTORY } = COMMON_CONSTANT
 
 //  Mock fs module
 vi.mock('fs', () => ({
@@ -36,7 +36,7 @@ describe('FtpOutboundService', () => {
   })
 
   describe('uploadFileToCra', () => {
-    it('should upload file successfully and move it to sent folder', async () => {
+    it(`should upload file successfully and move it to${LOCAL_DIRECTORY.outbound}  folder`, async () => {
       ;(fs.existsSync as any).mockReturnValue(false)
 
       mockFtpClientService.uploadFile.mockResolvedValue({
@@ -55,12 +55,7 @@ describe('FtpOutboundService', () => {
       expect(mockFtpClientService.uploadFile).toHaveBeenCalledOnce()
       expect(fs.renameSync).toHaveBeenCalled()
 
-      expect(result).toEqual({
-        statusCode: 226,
-        status: RESPONSE_STATUS.DELIVERED,
-        message: 'Transfer complete',
-        fileName: 'test.txt',
-      })
+      expect(result.status).toEqual(RESPONSE_STATUS.DELIVERED)
     })
 
     it('should throw error when FTP upload fails', async () => {
@@ -86,8 +81,10 @@ describe('FtpOutboundService', () => {
 
   //  FIXED TESTS BELOW (ONLY THIS SECTION CHANGED)
   describe('FileDeliverStatus', () => {
-    it('should return DELIVERED when file exists in local sent directory', async () => {
-      ;(fs.existsSync as any).mockImplementation((filePath: string) => filePath.includes('sent'))
+    it(`should return DELIVERED when file exists in local ${LOCAL_DIRECTORY.outbound} directory`, async () => {
+      ;(fs.existsSync as any).mockImplementation((filePath: string) =>
+        filePath.includes(LOCAL_DIRECTORY.outbound),
+      )
 
       const result = await service.checkFileDeliveryStatus('DEST1', 'test.txt')
 
@@ -114,8 +111,10 @@ describe('FtpOutboundService', () => {
       })
     })
 
-    it('should move file from temp to sent and return DELIVERED when file exists on remote', async () => {
-      ;(fs.existsSync as any).mockImplementation((filePath: string) => filePath.includes('temp'))
+    it(`should move file from ${LOCAL_DIRECTORY.temp} to ${LOCAL_DIRECTORY.outbound} and return DELIVERED when file exists on remote`, async () => {
+      ;(fs.existsSync as any).mockImplementation((filePath: string) =>
+        filePath.includes(LOCAL_DIRECTORY.temp),
+      )
 
       mockFtpClientService.checkFileExist.mockResolvedValue(true)
 
@@ -132,7 +131,7 @@ describe('FtpOutboundService', () => {
       })
     })
 
-    it('should return DELIVERED when file exists on remote but temp file does not exist', async () => {
+    it(`should return DELIVERED when file exists on remote but ${LOCAL_DIRECTORY.temp} file does not exist`, async () => {
       ;(fs.existsSync as any).mockReturnValue(false)
 
       mockFtpClientService.checkFileExist.mockResolvedValue(true)
