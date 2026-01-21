@@ -98,6 +98,18 @@ export class FtpOutboundController {
     return this.FtpOutboundService.checkFileDeliveryStatus(destinationId, fileName)
   }
 
+  @Get('destinations/:destinationId/files')
+  async listFiles(@Param('destinationId') destinationId: string) {
+    this.logger.log('Received Requestbody in listFiles endpoint ', destinationId)
+    if (!destinationId) {
+      return new BadRequestException('destinationId is required in params')
+    }
+    if (!DESTINATION_ID.includes(destinationId)) {
+      return new BadRequestException('Destination id is invalid')
+    }
+    return await this.FtpOutboundService.listFiles(destinationId)
+  }
+
   @Get('download')
   async downloadFile() {
     return this.FtpOutboundService.downloadFile()

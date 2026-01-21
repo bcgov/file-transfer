@@ -29,18 +29,6 @@ export class FtpClientService {
     return client
   }
 
-  async checkFileExist(cra_remoteDir: string, fileName: string) {
-    const client = await this.getClient()
-
-    try {
-      const files = await client.list(cra_remoteDir)
-      return files.some((eachFile) => eachFile.name === fileName)
-    } catch (error) {
-      console.error('Error while checking File Exist on Remote Server', error)
-      return false
-    }
-  }
-
   async uploadFile(localFilePath: string, remoteDir: string, remoteFileName: string) {
     console.log('uploadFile ftp clent', localFilePath, remoteDir, remoteFileName)
     const client = await this.getClient()
@@ -53,10 +41,38 @@ export class FtpClientService {
     // console.log('File Upload Response', result)
     await client.rename(tempPath, finalPath)
     this.logger.log(`Uploded FileName: ${remoteFileName}`)
+    client.close()
     return result
+  }
+  async checkFileExist(cra_remoteDir: string, fileName: string) {
+    const client = await this.getClient()
+
+    try {
+      const files = await client.list(cra_remoteDir)
+      console.log('files in delivery status', JSON.stringify(files, null, 2))
+      return files.some((eachFile) => eachFile.name === fileName)
+    } catch (error) {
+      console.error('Error while checking File Exist on Remote Server', error)
+      return false
+    } finally {
+      client.close()
+    }
   }
 
   // this.logger.log('Host', this.configService.get<string>('FTP_HOST'));
+
+  async listFiles(remotePath: string) {
+    console.log('Remote path===========>', remotePath)
+    const client = await this.getClient()
+    try {
+      return await client.list(remotePath)
+    } catch (error) {
+      this.logger.error('Got Error while listing the files', error)
+      return []
+    } finally {
+      client.close()
+    }
+  }
 
   async downloadFile(local_inboundDir: string, cra_remoteDir: string) {
     const client = await this.getClient()

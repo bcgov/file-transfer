@@ -111,6 +111,26 @@ export class FtpOutboundService {
     }
   }
 
+  async listFiles(destinationId: string) {
+    const files = await this.ftpClientService.listFiles(csa_remoteDir)
+    console.log('files----------->', files)
+
+    const result = files.map((eachFile) => {
+      console.log('each file', eachFile)
+      return {
+        fileName: eachFile.name,
+        size: eachFile.size,
+        lastModifiedAt: eachFile.rawModifiedAt,
+      }
+    })
+
+    return {
+      status: RESPONSE_STATUS.DELIVERED,
+      statusCode: 200,
+      data: { destinationId, files: result },
+    }
+  }
+
   async downloadFile() {
     return this.ftpClientService.downloadFile(local_inboundDir, csa_remoteDir)
   }

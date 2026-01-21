@@ -23,6 +23,7 @@ describe('FtpOutboundService', () => {
     uploadFile: vi.fn(),
     downloadFile: vi.fn(),
     checkFileExist: vi.fn(),
+    listFiles: vi.fn(),
   }
 
   const mockFile = {
@@ -148,6 +149,48 @@ describe('FtpOutboundService', () => {
         statusCode: 200,
         message: 'File Uploded successfuly to the Destination',
       })
+    })
+  })
+
+  // List file endpoint Test case
+  describe('ListFiles', async () => {
+    it('It should list all the files from Remote server', async () => {
+      mockFtpClientService.listFiles.mockResolvedValue([
+        {
+          name: 'test.txt',
+          size: 656,
+          rawModifiedAt: 'Jan 20 06:19',
+        },
+      ])
+
+      const result = await service.listFiles('remoteDir')
+
+      expect(result.status).toEqual('DELIVERED')
+      expect(result.statusCode).toEqual(200)
+      expect(result.data).toBeTypeOf('object')
+      expect(result.data.files).toBeTypeOf('object')
+    })
+
+    it('should return FAILED when FTP client throws an error', async () => {
+      mockFtpClientService.listFiles.mockRejectedValue(new Error('FTP connection failed'))
+
+      await expect(service.listFiles('remoteDir')).rejects.toThrow('FTP connection failed')
+    })
+
+    it('should return FAILED when remote directory does not exist', async () => {
+      mockFtpClientService.listFiles.mockRejectedValue(new Error('Directory not found'))
+
+      await expect(service.listFiles('remoteDir')).rejects.toThrow('Directory not found')
+    })
+
+    it('should return DELIVERED with empty files list when no files exist', async () => {
+      mockFtpClientService.listFiles.mockResolvedValue([])
+
+      const result = await service.listFiles('remoteDir')
+
+      expect(result.status).toEqual('DELIVERED')
+      expect(result.statusCode).toEqual(200)
+      expect(result.data.files).toEqual([])
     })
   })
 })
