@@ -22,7 +22,7 @@ import { COMMON_CONSTANT } from '../../common/common.constant'
 const { DESTINATION_ID } = COMMON_CONSTANT
 
 @ApiTags('FTP')
-@Controller('v1')
+@Controller()
 export class FtpOutboundController {
   private readonly logger = new Logger(FtpOutboundController.name)
   constructor(private readonly FtpOutboundService: FtpOutboundService) {}
