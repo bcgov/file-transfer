@@ -18,7 +18,7 @@ const {
 export class FtpOutboundService {
   private readonly logger = new Logger(FtpOutboundService.name)
 
-  constructor(private readonly ftpClientService: FtpClientService) {}
+  constructor(private readonly ftpClientService: FtpClientService) { }
 
   async uploadFileToCra(request: UploadFileInterface) {
     const { file, destinationId, fileName } = request
@@ -28,14 +28,14 @@ export class FtpOutboundService {
     // encrypt file buffer in memory before saving to disk or uploading
 
     const tempDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.temp)
-    const sentDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.sent)
+    const sentDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.outbound)
 
-    // Ensure directories exist
-    ;[tempDirPath, sentDirPath].forEach((dir) => {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true })
-      }
-    })
+      // Ensure directories exist
+      ;[tempDirPath, sentDirPath].forEach((dir) => {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true })
+        }
+      })
     const tempFilePath = path.join(tempDirPath, file.originalname)
     const sentFilePath = path.join(sentDirPath, file.originalname)
 
@@ -43,9 +43,12 @@ export class FtpOutboundService {
     fs.writeFileSync(tempFilePath, file.buffer)
     if (fs.existsSync(sentFilePath)) {
       this.logger.log(`Temporary file created at ${tempFilePath}`)
-      throw new ConflictException(
-        `File ${file.originalname} has already been sent. Duplicate files are not allowed.`,
-      )
+      return {
+        statusCode: 201,
+        status: RESPONSE_STATUS.DELIVERED,
+        message: 'File already uploded to the destination server',
+        fileName: file.originalname,
+      }
       // return { status: RESPONSE_STATUS.FAILED, statusCode: 409, message: `File ${file.originalname} has already been sent. Duplicate files are not allowed.` }
     }
 
@@ -73,7 +76,7 @@ export class FtpOutboundService {
     const localSentFilePath = path.join(
       local_outboundDir,
       destinationId,
-      LOCAL_DIRECTORY.sent,
+      LOCAL_DIRECTORY.outbound,
       fileName,
     )
     const localTepmFilePath = path.join(
