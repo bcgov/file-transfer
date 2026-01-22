@@ -45,7 +45,7 @@ export class FtpOutboundService {
       this.logger.log(`Temporary file created at ${tempFilePath}`)
       return {
         statusCode: 201,
-        status: RESPONSE_STATUS.DELIVERED,
+        status: RESPONSE_STATUS.SUCCESS,
         message: 'File already uploded to the destination server',
         fileName: file.originalname,
         destinationId: destinationId,
@@ -63,7 +63,7 @@ export class FtpOutboundService {
       fs.renameSync(tempFilePath, path.join(sentDirPath, file.originalname))
       return {
         statusCode: craFtpResponse?.code,
-        status: RESPONSE_STATUS.DELIVERED,
+        status: RESPONSE_STATUS.SUCCESS,
         message: craFtpResponse?.message,
         fileName: file.originalname,
         destinationId: destinationId,
@@ -87,10 +87,9 @@ export class FtpOutboundService {
       LOCAL_DIRECTORY.temp,
       fileName,
     )
-    console.log('File Exist on local Result', fs.existsSync(localSentFilePath))
     if (fs.existsSync(localSentFilePath)) {
       return {
-        status: RESPONSE_STATUS.DELIVERED,
+        status: RESPONSE_STATUS.SUCCESS,
         statusCode: 200,
         messge: 'File Delivered Successfuly to the Destination',
       }
@@ -109,7 +108,7 @@ export class FtpOutboundService {
         fs.renameSync(localTepmFilePath, localSentFilePath)
       }
       return {
-        status: RESPONSE_STATUS.DELIVERED,
+        status: RESPONSE_STATUS.SUCCESS,
         statusCode: 200,
         message: 'File Delivered successfuly to the Destination',
       }
@@ -118,7 +117,6 @@ export class FtpOutboundService {
 
   async listFiles(destinationId: string) {
     const files = await this.ftpClientService.listFiles(csa_remoteDir)
-
     const result = files.map((eachFile) => {
       return {
         fileName: eachFile.name,
@@ -128,9 +126,10 @@ export class FtpOutboundService {
     })
 
     return {
-      status: RESPONSE_STATUS.DELIVERED,
+      status: RESPONSE_STATUS.SUCCESS,
       statusCode: 200,
-      data: { destinationId, files: result },
+      destinationId,
+      files: result,
     }
   }
 
