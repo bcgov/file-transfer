@@ -2,6 +2,7 @@
 
 ## 📌 Overview
 <<<<<<< HEAD
+<<<<<<< HEAD
 This project is a **File Transfer Microservice** built using **NestJS** that enables secure, reliable file exchange between systems using **FTP**.
 
 The service is designed for **system-to-system integration**, similar to **CSA ↔ CRA** style communication, where files are exchanged without human interaction.
@@ -190,51 +191,79 @@ Md Saif Raza
 Backend Developer – NestJS | Node.js
 
 =======
+=======
+This project is a **File Transfer Microservice** built using **NestJS** that enables secure, reliable file exchange between systems using **FTP**.
+>>>>>>> c3826f09744644da87701a9dd29f7668bcb403c4
 
-This project is a **File Transfer Microservice** built using **NestJS** that enables secure,
-reliable file exchange between systems using **FTP**.
-
-The service is designed for **system-to-system integration**, similar to **CSA ↔ CRA** style
-communication, where files are exchanged without human interaction.
+The service is designed for **system-to-system integration**, similar to **CSA ↔ CRA** style communication, where files are exchanged without human interaction.
 
 ---
 
 ## 🏗️ High-Level Architecture
 
-Client / Upstream System | v +---------------------------+ | File Transfer Microservice| | (NestJS)
-| +---------------------------+ | v +---------------------------+ | FTP Server |
+Client / Upstream System
+|
+v
 +---------------------------+
+| File Transfer Microservice|
+| (NestJS) |
++---------------------------+
+|
+v
++---------------------------+
+| FTP Server |
++---------------------------+
+
+
 
 ---
 
 ## 🧰 Technology Stack
 
-| Technology | Purpose             |
-| ---------- | ------------------- |
-| Node.js    | Runtime             |
-| NestJS     | Backend framework   |
-| TypeScript | Strong typing       |
-| FTP / SFTP | File transfer       |
-| Joi        | Input validation    |
-| Docker     | Containerization    |
-| OpenShift  | Deployment platform |
+| Technology | Purpose |
+|----------|---------|
+| Node.js | Runtime |
+| NestJS | Backend framework |
+| TypeScript | Strong typing |
+| FTP / SFTP | File transfer |
+| Joi | Input validation |
+| Docker | Containerization |
+| OpenShift | Deployment platform |
 
 ---
 
 ## 📂 Project Structure
 
-src/ ├── app.module.ts ├── main.ts ├── user/ │ ├── dto/ │ │ └── create-user.dto.ts │ ├── interfaces/
-│ │ └── user.interface.ts │ ├── user.controller.ts │ ├── user.service.ts │ └── user.module.ts ├──
-ftp/ | ├── controllers/ | | └── outbound.file.controller.ts | ├── dto/ │ │ └── outbound.file.dto.ts
-| ├── services/ │ │ └── outbound.file.service.ts ├── common/ │ ├── interfaces/ │ └── utils/ └──
-config/ | └── ftp.config.ts
+src/
+├── app.module.ts
+├── main.ts
+├── user/
+│ ├── dto/
+│ │ └── create-user.dto.ts
+│ ├── interfaces/
+│ │ └── user.interface.ts
+│ ├── user.controller.ts
+│ ├── user.service.ts
+│ └── user.module.ts
+├── ftp/
+| ├── controllers/
+| | └── outbound.file.controller.ts
+| ├── dto/
+│ │ └── outbound.file.dto.ts
+| ├── services/
+│ │ └── outbound.file.service.ts
+├── common/
+│ ├── interfaces/
+│ └── utils/
+└── config/
+| └── ftp.config.ts
+
 
 ---
 
 ## 🚀 Getting Started
 
 ### 1️⃣ Prerequisites
-
 - Node.js ≥ 18
 - npm or yarn
 - NestJS CLI
@@ -351,5 +380,8 @@ In-memory storage used for demo (DB-ready design)
 Md Saif Raza
 Backend Developer – NestJS | Node.js
 
+<<<<<<< HEAD
 ```
 >>>>>>> d048ccfb416761556a6f450bc1903a092b81ad21
+=======
+>>>>>>> c3826f09744644da87701a9dd29f7668bcb403c4
