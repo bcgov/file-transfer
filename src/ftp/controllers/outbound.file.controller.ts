@@ -111,7 +111,10 @@ export class FtpOutboundController {
   }
 
   @Get('download')
-  async downloadFile() {
-    return this.FtpOutboundService.downloadFile()
+  async downloadFile(
+    @Param('destinationId') destinationId : string,
+    @Param('fileName') fileName : string,
+  ) {
+    return this.FtpOutboundService.downloadFileFromLocalOrFtp(destinationId, fileName)
   }
 }

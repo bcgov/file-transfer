@@ -74,29 +74,10 @@ export class FtpClientService {
     }
   }
 
-  async downloadFile(local_inboundDir: string, cra_remoteDir: string) {
+  async downloadSingleFile(remoteFilePath: string, localFilePath: string) {
     const client = await this.getClient()
-
-    // const localDir = path.join(process.cwd(), local_inboundDir)
-    const localDir = local_inboundDir
-    if (!fs.existsSync(localDir)) {
-      fs.mkdirSync(localDir)
-    }
-    const files = await client.list(cra_remoteDir)
-    for (const file of files) {
-      console.log('File from ftp', file)
-      console.log('Local Dir for download=========------->', cra_remoteDir, file.name, localDir)
-      if (file.isDirectory || file.name.split('.').pop() === 'tmp') continue
-      const localFilePath = path.join(localDir, file.name)
-      const remoteFilePath = `${cra_remoteDir}/${file.name}`
-      // const processedPath = `${cra_remoteDir}/processed/${file.name}`
-      const processedPath = `${cra_remoteDir}/${file.name}`
-      const result = await client.downloadTo(localFilePath, remoteFilePath)
-      // await client.ensureDir(`${cra_remoteDir}/processed`)
-      const moveResult = await client.rename(remoteFilePath, processedPath)
-      console.log('download Result', result, file.name, 'move REsult', moveResult)
-    }
-
-    return { statusCode: 200, message: 'File downloded successfuly' }
+    this.logger.log(`Downloading from FTP: ${remoteFilePath} -> ${localFilePath}`)
+    await client.downloadTo(remoteFilePath, localFilePath)
+    return localFilePath
   }
 }

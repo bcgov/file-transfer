@@ -1,4 +1,4 @@
-import { Injectable, Logger, ConflictException } from '@nestjs/common'
+import { Injectable, Logger, ConflictException, NotFoundException } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
 import { FtpClientService } from './ftp-client.service'
@@ -18,7 +18,7 @@ const {
 export class FtpOutboundService {
   private readonly logger = new Logger(FtpOutboundService.name)
 
-  constructor(private readonly ftpClientService: FtpClientService) {}
+  constructor(private readonly ftpClientService: FtpClientService) { }
 
   async uploadFileToCra(request: UploadFileInterface) {
     const { file, destinationId, fileName } = request
@@ -28,14 +28,14 @@ export class FtpOutboundService {
     // encrypt file buffer in memory before saving to disk or uploading
 
     const tempDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.temp)
-    const sentDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.sent)
+    const sentDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.outbound)
 
-    // Ensure directories exist
-    ;[tempDirPath, sentDirPath].forEach((dir) => {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true })
-      }
-    })
+      // Ensure directories exist
+      ;[tempDirPath, sentDirPath].forEach((dir) => {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true })
+        }
+      })
     const tempFilePath = path.join(tempDirPath, file.originalname)
     const sentFilePath = path.join(sentDirPath, file.originalname)
 
@@ -73,7 +73,7 @@ export class FtpOutboundService {
     const localSentFilePath = path.join(
       local_outboundDir,
       destinationId,
-      LOCAL_DIRECTORY.sent,
+      LOCAL_DIRECTORY.outbound,
       fileName,
     )
     const localTepmFilePath = path.join(
@@ -87,7 +87,7 @@ export class FtpOutboundService {
       return {
         status: RESPONSE_STATUS.DELIVERED,
         statusCode: 200,
-        messge: 'File Uploded Successfuly to the Destination',
+        messge: 'File Delivered Successfuly to the Destination',
       }
     } else {
       const isFileExistOnRemote = await this.ftpClientService.checkFileExist(
@@ -106,7 +106,7 @@ export class FtpOutboundService {
       return {
         status: RESPONSE_STATUS.DELIVERED,
         statusCode: 200,
-        message: 'File Uploded successfuly to the Destination',
+        message: 'File Delivered successfuly to the Destination',
       }
     }
   }
@@ -131,7 +131,22 @@ export class FtpOutboundService {
     }
   }
 
-  async downloadFile() {
-    return this.ftpClientService.downloadFile(local_inboundDir, csa_remoteDir)
+  async downloadFileFromLocalOrFtp(destinationId: string, fileName: string) {
+
+    const localFileDir = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.inbound)
+    const localInboundFilePath = `${localFileDir}/${fileName}`
+    const remoteFilePath = `${csa_remoteDir}/${fileName}`
+    if (!fs.existsSync(localFileDir)) {
+      fs.mkdirSync(localFileDir)
+    }
+    await this.ftpClientService.downloadSingleFile(remoteFilePath, localInboundFilePath)
+
+
+        // After download, verify it exists
+    if (!fs.existsSync(localInboundFilePath)) {
+      throw new NotFoundException(`Downloaded file not found locally after FTP download: ${fileName}`)
+    }
+
+    return { localInboundFilePath, fileName }
   }
 }
