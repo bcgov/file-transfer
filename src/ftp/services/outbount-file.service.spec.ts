@@ -56,7 +56,7 @@ describe('FtpOutboundService', () => {
       expect(mockFtpClientService.uploadFile).toHaveBeenCalledOnce()
       expect(fs.renameSync).toHaveBeenCalled()
 
-      expect(result.status).toEqual(RESPONSE_STATUS.DELIVERED)
+      expect(result.status).toEqual(RESPONSE_STATUS.SUCCESS)
     })
 
     it('should throw error when FTP upload fails', async () => {
@@ -82,7 +82,7 @@ describe('FtpOutboundService', () => {
 
   //  FIXED TESTS BELOW (ONLY THIS SECTION CHANGED)
   describe('FileDeliverStatus', () => {
-    it(`should return DELIVERED when file exists in local ${LOCAL_DIRECTORY.outbound} directory`, async () => {
+    it(`should return SUCCESS when file exists in local ${LOCAL_DIRECTORY.outbound} directory`, async () => {
       ;(fs.existsSync as any).mockImplementation((filePath: string) =>
         filePath.includes(LOCAL_DIRECTORY.outbound),
       )
@@ -90,7 +90,7 @@ describe('FtpOutboundService', () => {
       const result = await service.checkFileDeliveryStatus('DEST1', 'test.txt')
 
       expect(result).toEqual({
-        status: RESPONSE_STATUS.DELIVERED,
+        status: RESPONSE_STATUS.SUCCESS,
         statusCode: 200,
         messge: 'File Uploded Successfuly to the Destination',
       })
@@ -112,7 +112,7 @@ describe('FtpOutboundService', () => {
       })
     })
 
-    it(`should move file from ${LOCAL_DIRECTORY.temp} to ${LOCAL_DIRECTORY.outbound} and return DELIVERED when file exists on remote`, async () => {
+    it(`should move file from ${LOCAL_DIRECTORY.temp} to ${LOCAL_DIRECTORY.outbound} and return SUCCESS when file exists on remote`, async () => {
       ;(fs.existsSync as any).mockImplementation((filePath: string) =>
         filePath.includes(LOCAL_DIRECTORY.temp),
       )
@@ -126,13 +126,13 @@ describe('FtpOutboundService', () => {
       expect(renameSpy).toHaveBeenCalledOnce()
 
       expect(result).toEqual({
-        status: RESPONSE_STATUS.DELIVERED,
+        status: RESPONSE_STATUS.SUCCESS,
         statusCode: 200,
         message: 'File Uploded successfuly to the Destination',
       })
     })
 
-    it(`should return DELIVERED when file exists on remote but ${LOCAL_DIRECTORY.temp} file does not exist`, async () => {
+    it(`should return SUCCESS when file exists on remote but ${LOCAL_DIRECTORY.temp} file does not exist`, async () => {
       ;(fs.existsSync as any).mockReturnValue(false)
 
       mockFtpClientService.checkFileExist.mockResolvedValue(true)
@@ -144,7 +144,7 @@ describe('FtpOutboundService', () => {
       expect(renameSpy).not.toHaveBeenCalled()
 
       expect(result).toEqual({
-        status: RESPONSE_STATUS.DELIVERED,
+        status: RESPONSE_STATUS.SUCCESS,
         statusCode: 200,
         message: 'File Uploded successfuly to the Destination',
       })
@@ -164,10 +164,9 @@ describe('FtpOutboundService', () => {
 
       const result = await service.listFiles('remoteDir')
 
-      expect(result.status).toEqual('DELIVERED')
+      expect(result.status).toEqual('SUCCESS')
       expect(result.statusCode).toEqual(200)
-      expect(result.data).toBeTypeOf('object')
-      expect(result.data.files).toBeTypeOf('object')
+      expect(result.files).toBeTypeOf('object')
     })
 
     it('should return FAILED when FTP client throws an error', async () => {
@@ -182,14 +181,14 @@ describe('FtpOutboundService', () => {
       await expect(service.listFiles('remoteDir')).rejects.toThrow('Directory not found')
     })
 
-    it('should return DELIVERED with empty files list when no files exist', async () => {
+    it('should return SUCCESS with empty files list when no files exist', async () => {
       mockFtpClientService.listFiles.mockResolvedValue([])
 
       const result = await service.listFiles('remoteDir')
 
-      expect(result.status).toEqual('DELIVERED')
+      expect(result.status).toEqual('SUCCESS')
       expect(result.statusCode).toEqual(200)
-      expect(result.data.files).toEqual([])
+      expect(result.files).toEqual([])
     })
   })
 })

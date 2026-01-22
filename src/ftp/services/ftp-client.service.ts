@@ -13,12 +13,7 @@ export class FtpClientService {
 
   private async getClient(): Promise<Client> {
     const client = new Client()
-    console.log('ftp host===================>', FTP_HOST, FTP_PORT, FTP_PASSWORD, FTP_USER)
     await client.access({
-      // host: this.configService.get<string>('FTP_HOST')!,
-      // port: Number(this.configService.get('FTP_PORT') || 21),
-      // user: this.configService.get<string>('FTP_USER')!,
-      // password: this.configService.get<string>('FTP_PASSWORD')!,
       host: FTP_HOST,
       port: Number(FTP_PORT || 21),
       user: FTP_USER,
@@ -30,7 +25,6 @@ export class FtpClientService {
   }
 
   async uploadFile(localFilePath: string, remoteDir: string, remoteFileName: string) {
-    console.log('uploadFile ftp clent', localFilePath, remoteDir, remoteFileName)
     const client = await this.getClient()
 
     await client.ensureDir(remoteDir)
@@ -38,9 +32,8 @@ export class FtpClientService {
     const finalPath = `${remoteDir}/${remoteFileName}`
 
     const result = await client.uploadFrom(localFilePath, tempPath)
-    // console.log('File Upload Response', result)
     await client.rename(tempPath, finalPath)
-    this.logger.log(`Uploded FileName: ${remoteFileName}`)
+    this.logger.log(`Uploded: ${remoteFileName} to remote server`)
     client.close()
     return result
   }
@@ -49,10 +42,9 @@ export class FtpClientService {
 
     try {
       const files = await client.list(cra_remoteDir)
-      console.log('files in delivery status', JSON.stringify(files, null, 2))
       return files.some((eachFile) => eachFile.name === fileName)
     } catch (error) {
-      console.error('Error while checking File Exist on Remote Server', error)
+      this.logger.error('Error while checking File Exist on Remote Server', error)
       return false
     } finally {
       client.close()
@@ -62,7 +54,6 @@ export class FtpClientService {
   // this.logger.log('Host', this.configService.get<string>('FTP_HOST'));
 
   async listFiles(remotePath: string) {
-    console.log('Remote path===========>', remotePath)
     const client = await this.getClient()
     try {
       return await client.list(remotePath)
@@ -84,17 +75,14 @@ export class FtpClientService {
     }
     const files = await client.list(cra_remoteDir)
     for (const file of files) {
-      console.log('File from ftp', file)
-      console.log('Local Dir for download=========------->', cra_remoteDir, file.name, localDir)
       if (file.isDirectory || file.name.split('.').pop() === 'tmp') continue
       const localFilePath = path.join(localDir, file.name)
       const remoteFilePath = `${cra_remoteDir}/${file.name}`
       // const processedPath = `${cra_remoteDir}/processed/${file.name}`
       const processedPath = `${cra_remoteDir}/${file.name}`
-      const result = await client.downloadTo(localFilePath, remoteFilePath)
+      await client.downloadTo(localFilePath, remoteFilePath)
       // await client.ensureDir(`${cra_remoteDir}/processed`)
-      const moveResult = await client.rename(remoteFilePath, processedPath)
-      console.log('download Result', result, file.name, 'move REsult', moveResult)
+      await client.rename(remoteFilePath, processedPath)
     }
 
     return { statusCode: 200, message: 'File downloded successfuly' }

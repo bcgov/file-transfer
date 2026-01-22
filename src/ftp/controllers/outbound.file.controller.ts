@@ -98,7 +98,7 @@ export class FtpOutboundController {
     return this.FtpOutboundService.checkFileDeliveryStatus(destinationId, fileName)
   }
 
-  @Get('destinations/:destinationId/files')
+  @Get('destinations/:destinationId/remote-files')
   async listFiles(@Param('destinationId') destinationId: string) {
     this.logger.log('Received Requestbody in listFiles endpoint ', destinationId)
     if (!destinationId) {
