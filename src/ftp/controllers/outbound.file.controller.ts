@@ -9,7 +9,9 @@ import {
   UseInterceptors,
   BadRequestException,
   Param,
+  Res,
 } from '@nestjs/common'
+import { Response } from 'express'
 import { FtpOutboundService } from '../services/outbound-file.service'
 import { CreateFileDto } from '../dto/outbound.file.dto'
 import { Logger } from '@nestjs/common'
@@ -19,7 +21,7 @@ import { ApiTags, ApiBody, ApiConsumes, ApiOperation, ApiResponse } from '@nestj
 import { OutboundUploadResponseDto } from '../dto/outbound.response.dto'
 import { COMMON_CONSTANT } from '../../common/common.constant'
 
-const { DESTINATION_ID } = COMMON_CONSTANT
+const { DESTINATION_ID, RESPONSE_STATUS } = COMMON_CONSTANT
 
 @ApiTags('FTP')
 @Controller()
@@ -72,7 +74,7 @@ export class FtpOutboundController {
       this.logger.error('Error uploading file to CRA FTP', error)
       throw new HttpException(
         {
-          status: 'FAILED',
+          status: RESPONSE_STATUS.FAILED,
           statusCode: error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
           message: error?.message,
         },
@@ -86,35 +88,81 @@ export class FtpOutboundController {
     @Param('destinationId') destinationId: string,
     @Param('fileName') fileName: string,
   ) {
-    this.logger.log(
-      `Received data in params for File Delivery Status, destinationId : ${destinationId}, fileName: ${fileName}`,
-    )
-    if (!destinationId || !fileName) {
-      throw new BadRequestException('destinationId or fileName is missing in param')
+    try {
+      this.logger.log(
+        `Received data in params for File Delivery Status, destinationId : ${destinationId}, fileName: ${fileName}`,
+      )
+      if (!destinationId || !fileName) {
+        throw new BadRequestException('destinationId or fileName is missing in param')
+      }
+      if (!DESTINATION_ID.includes(destinationId)) {
+        throw new BadRequestException('destinationId is invalid, Please use valid destinationId')
+      }
+      return this.FtpOutboundService.checkFileDeliveryStatus(destinationId, fileName)
+    } catch (error) {
+      this.logger.error('Error while checking the delivery status of filefrom remote server', error)
+      throw new HttpException(
+        {
+          status: RESPONSE_STATUS.FAILED,
+          statusCode: error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
+          message: error?.message,
+        },
+        error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
+      )
     }
-    if (!DESTINATION_ID.includes(destinationId)) {
-      throw new BadRequestException('destinationId is invalid, Please use valid destinationId')
-    }
-    return this.FtpOutboundService.checkFileDeliveryStatus(destinationId, fileName)
   }
 
   @Get('destinations/:destinationId/remote-files')
   async listFiles(@Param('destinationId') destinationId: string) {
-    this.logger.log('Received Requestbody in listFiles endpoint ', destinationId)
-    if (!destinationId) {
-      return new BadRequestException('destinationId is required in params')
+    try {
+      this.logger.log('Received Requestbody in listFiles endpoint ', destinationId)
+      if (!destinationId) {
+        return new BadRequestException('destinationId is required in params')
+      }
+      if (!DESTINATION_ID.includes(destinationId)) {
+        return new BadRequestException('Destination id is invalid')
+      }
+      return await this.FtpOutboundService.listFiles(destinationId)
+    } catch (error) {
+      this.logger.error('Error while listing the files from remote server', error)
+      throw new HttpException(
+        {
+          status: RESPONSE_STATUS.FAILED,
+          statusCode: error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
+          message: error?.message,
+        },
+        error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
+      )
     }
-    if (!DESTINATION_ID.includes(destinationId)) {
-      return new BadRequestException('Destination id is invalid')
-    }
-    return await this.FtpOutboundService.listFiles(destinationId)
   }
 
-  @Get('download')
+  @Get('destinations/:destinationId/files/download/:fileName')
   async downloadFile(
-    @Param('destinationId') destinationId : string,
-    @Param('fileName') fileName : string,
+    @Param('destinationId') destinationId: string,
+    @Param('fileName') fileName: string,
+    @Res() res: Response,
   ) {
-    return this.FtpOutboundService.downloadFileFromLocalOrFtp(destinationId, fileName)
+    try {
+      if (!destinationId || !fileName) {
+        throw new BadRequestException('destinationId and fileName are required')
+      }
+      const { filePath, remoteFileName } = await this.FtpOutboundService.downloadFileFromLocalOrFtp(
+        destinationId,
+        fileName,
+      )
+      return res.download(filePath, remoteFileName)
+    } catch (error) {
+      this.logger.error('Error in downloadFile API', error)
+
+      // Keep your standard response structure
+      throw new HttpException(
+        {
+          status: RESPONSE_STATUS.FAILED,
+          statusCode: error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+          message: error?.message || 'Download failed',
+        },
+        error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      )
+    }
   }
 }

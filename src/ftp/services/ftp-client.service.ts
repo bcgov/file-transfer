@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Client } from 'basic-ftp'
-import path from 'path'
-import fs from 'fs'
 
 const { FTP_HOST, FTP_PORT, FTP_USER, FTP_PASSWORD } = process.env
 
@@ -37,11 +35,11 @@ export class FtpClientService {
     client.close()
     return result
   }
-  async checkFileExist(cra_remoteDir: string, fileName: string) {
+  async checkFileExist(outbound_dir: string, fileName: string) {
     const client = await this.getClient()
 
     try {
-      const files = await client.list(cra_remoteDir)
+      const files = await client.list(outbound_dir)
       return files.some((eachFile) => eachFile.name === fileName)
     } catch (error) {
       this.logger.error('Error while checking File Exist on Remote Server', error)
@@ -66,9 +64,15 @@ export class FtpClientService {
   }
 
   async downloadSingleFile(remoteFilePath: string, localFilePath: string) {
-    const client = await this.getClient()
-    this.logger.log(`Downloading from FTP: ${remoteFilePath} -> ${localFilePath}`)
-    await client.downloadTo(remoteFilePath, localFilePath)
-    return localFilePath
+    try {
+      const client = await this.getClient()
+      this.logger.log(`Downloading from FTP: ${remoteFilePath} -> ${localFilePath}`)
+      await client.downloadTo(localFilePath, remoteFilePath)
+      return localFilePath
+    } catch (error) {
+      // console.log('errr==========>', error)
+      this.logger.error('Error while downloading file', error)
+      return false
+    }
   }
 }

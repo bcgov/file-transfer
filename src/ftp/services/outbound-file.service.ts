@@ -1,24 +1,20 @@
-import { Injectable, Logger, ConflictException, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
 import { FtpClientService } from './ftp-client.service'
 import { COMMON_CONSTANT } from '../../common/common.constant'
 import { UploadFileInterface } from '../interfaces/outbound.interface'
+import { SERVER_CONFIG } from 'src/configs/server.config'
 
-const {
-  local_inboundDir,
-  local_outboundDir,
-  cra_remoteDir,
-  csa_remoteDir,
-  RESPONSE_STATUS,
-  LOCAL_DIRECTORY,
-} = COMMON_CONSTANT
+const { LOCAL_STORAGE_DIR, INBOUND_DIR, OUTBOUND_DIR } = SERVER_CONFIG
+
+const { RESPONSE_STATUS, LOCAL_DIRECTORY } = COMMON_CONSTANT
 
 @Injectable()
 export class FtpOutboundService {
   private readonly logger = new Logger(FtpOutboundService.name)
 
-  constructor(private readonly ftpClientService: FtpClientService) { }
+  constructor(private readonly ftpClientService: FtpClientService) {}
 
   async uploadFileToCra(request: UploadFileInterface) {
     const { file, destinationId, fileName } = request
@@ -27,15 +23,15 @@ export class FtpOutboundService {
     )
     // encrypt file buffer in memory before saving to disk or uploading
 
-    const tempDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.temp)
-    const sentDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.outbound)
+    const tempDirPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.temp)
+    const sentDirPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.outbound)
 
-      // Ensure directories exist
-      ;[tempDirPath, sentDirPath].forEach((dir) => {
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true })
-        }
-      })
+    // Ensure directories exist
+    ;[tempDirPath, sentDirPath].forEach((dir) => {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+    })
     const tempFilePath = path.join(tempDirPath, file.originalname)
     const sentFilePath = path.join(sentDirPath, file.originalname)
 
@@ -55,7 +51,7 @@ export class FtpOutboundService {
 
     const craFtpResponse = await this.ftpClientService.uploadFile(
       tempFilePath,
-      cra_remoteDir,
+      OUTBOUND_DIR,
       file.originalname,
     )
     this.logger.log(`CRA FTP Response: ${JSON.stringify(craFtpResponse)}`)
@@ -76,13 +72,13 @@ export class FtpOutboundService {
 
   async checkFileDeliveryStatus(destinationId: string, fileName: string) {
     const localSentFilePath = path.join(
-      local_outboundDir,
+      LOCAL_STORAGE_DIR,
       destinationId,
       LOCAL_DIRECTORY.outbound,
       fileName,
     )
     const localTepmFilePath = path.join(
-      local_outboundDir,
+      LOCAL_STORAGE_DIR,
       destinationId,
       LOCAL_DIRECTORY.temp,
       fileName,
@@ -94,10 +90,7 @@ export class FtpOutboundService {
         messge: 'File Delivered Successfuly to the Destination',
       }
     } else {
-      const isFileExistOnRemote = await this.ftpClientService.checkFileExist(
-        cra_remoteDir,
-        fileName,
-      )
+      const isFileExistOnRemote = await this.ftpClientService.checkFileExist(OUTBOUND_DIR, fileName)
 
       this.logger.log(`File ${fileName} Exist on Remote`, isFileExistOnRemote)
       if (!isFileExistOnRemote) {
@@ -116,7 +109,7 @@ export class FtpOutboundService {
   }
 
   async listFiles(destinationId: string) {
-    const files = await this.ftpClientService.listFiles(csa_remoteDir)
+    const files = await this.ftpClientService.listFiles(INBOUND_DIR)
     const result = files.map((eachFile) => {
       return {
         fileName: eachFile.name,
@@ -134,21 +127,34 @@ export class FtpOutboundService {
   }
 
   async downloadFileFromLocalOrFtp(destinationId: string, fileName: string) {
+    const localInboundDir = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.inbound)
+    const localOutbounDir = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.outbound)
+    const localInboundFilePath = `${localInboundDir}/${fileName}`
+    const localOutbounFilePath = `${localOutbounDir}/${fileName}`
+    const remoteFilePath = `${INBOUND_DIR}/${fileName}`
 
-    const localFileDir = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.inbound)
-    const localInboundFilePath = `${localFileDir}/${fileName}`
-    const remoteFilePath = `${csa_remoteDir}/${fileName}`
-    if (!fs.existsSync(localFileDir)) {
-      fs.mkdirSync(localFileDir)
+    if (!fs.existsSync(localInboundDir)) {
+      fs.mkdirSync(localInboundDir)
     }
-    await this.ftpClientService.downloadSingleFile(remoteFilePath, localInboundFilePath)
+    if (fs.existsSync(localOutbounFilePath)) {
+      return { filePath: localOutbounFilePath, remoteFileName: fileName }
+    }
+    const isFileDownloadable = await this.ftpClientService.downloadSingleFile(
+      remoteFilePath,
+      localInboundFilePath,
+    )
 
+    if (!isFileDownloadable) {
+      throw new NotFoundException(`File not Found: ${fileName}`)
+    }
 
-        // After download, verify it exists
+    // After download, verify it exists
     if (!fs.existsSync(localInboundFilePath)) {
-      throw new NotFoundException(`Downloaded file not found locally after FTP download: ${fileName}`)
+      throw new NotFoundException(
+        `Downloaded file not found locally after FTP download: ${fileName}`,
+      )
     }
 
-    return { localInboundFilePath, fileName }
+    return { filePath: localInboundFilePath, remoteFileName: fileName }
   }
 }

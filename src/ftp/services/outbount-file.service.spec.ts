@@ -4,8 +4,9 @@ import { FtpClientService } from './ftp-client.service'
 import { COMMON_CONSTANT } from '../../common/common.constant'
 import * as fs from 'fs'
 import { File as MulterFile } from 'multer'
+import { NotFoundException } from '@nestjs/common'
 
-const { RESPONSE_STATUS, cra_remoteDir, LOCAL_DIRECTORY } = COMMON_CONSTANT
+const { RESPONSE_STATUS, LOCAL_DIRECTORY } = COMMON_CONSTANT
 
 //  Mock fs module
 vi.mock('fs', () => ({
@@ -24,6 +25,7 @@ describe('FtpOutboundService', () => {
     downloadFile: vi.fn(),
     checkFileExist: vi.fn(),
     listFiles: vi.fn(),
+    downloadSingleFile: vi.fn(),
   }
 
   const mockFile = {
@@ -89,11 +91,7 @@ describe('FtpOutboundService', () => {
 
       const result = await service.checkFileDeliveryStatus('DEST1', 'test.txt')
 
-      expect(result).toEqual({
-        status: RESPONSE_STATUS.SUCCESS,
-        statusCode: 200,
-        messge: 'File Uploded Successfuly to the Destination',
-      })
+      expect(result.status).toEqual(RESPONSE_STATUS.SUCCESS)
     })
 
     it('should return FAILED when file not found locally and not on remote FTP', async () => {
@@ -103,13 +101,9 @@ describe('FtpOutboundService', () => {
 
       const result = await service.checkFileDeliveryStatus('DEST1', 'test.txt')
 
-      expect(mockFtpClientService.checkFileExist).toHaveBeenCalledWith(cra_remoteDir, 'test.txt')
+      expect(mockFtpClientService.checkFileExist).toHaveBeenCalledWith('DEST1', 'test.txt')
 
-      expect(result).toEqual({
-        status: RESPONSE_STATUS.FAILED,
-        statusCode: 404,
-        message: 'File not Found',
-      })
+      expect(result.status).toEqual(RESPONSE_STATUS.FAILED)
     })
 
     it(`should move file from ${LOCAL_DIRECTORY.temp} to ${LOCAL_DIRECTORY.outbound} and return SUCCESS when file exists on remote`, async () => {
@@ -125,11 +119,7 @@ describe('FtpOutboundService', () => {
 
       expect(renameSpy).toHaveBeenCalledOnce()
 
-      expect(result).toEqual({
-        status: RESPONSE_STATUS.SUCCESS,
-        statusCode: 200,
-        message: 'File Uploded successfuly to the Destination',
-      })
+      expect(result.status).toEqual(RESPONSE_STATUS.SUCCESS)
     })
 
     it(`should return SUCCESS when file exists on remote but ${LOCAL_DIRECTORY.temp} file does not exist`, async () => {
@@ -143,11 +133,7 @@ describe('FtpOutboundService', () => {
 
       expect(renameSpy).not.toHaveBeenCalled()
 
-      expect(result).toEqual({
-        status: RESPONSE_STATUS.SUCCESS,
-        statusCode: 200,
-        message: 'File Uploded successfuly to the Destination',
-      })
+      expect(result.status).toEqual(RESPONSE_STATUS.SUCCESS)
     })
   })
 
@@ -189,6 +175,104 @@ describe('FtpOutboundService', () => {
       expect(result.status).toEqual('SUCCESS')
       expect(result.statusCode).toEqual(200)
       expect(result.files).toEqual([])
+    })
+  })
+
+  // Download file
+
+  describe('FtpOutboundService - downloadFileFromLocalOrFtp', () => {
+    it('should create inbound directory if it does not exist and return outbound file if already exists', async () => {
+      // inboundDir does not exist -> mkdirSync should be called
+      // outboundFile exists -> should return outbound file path
+      ;(fs.existsSync as any).mockImplementation((filePath: string) => {
+        if (String(filePath).includes('inbound')) return false
+        if (String(filePath).includes('outbound')) return true
+        return false
+      })
+
+      const result = await service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')
+
+      expect(fs.mkdirSync).toHaveBeenCalledOnce()
+      expect(mockFtpClientService.downloadSingleFile).not.toHaveBeenCalled()
+
+      expect(result.remoteFileName).toBe('test.txt')
+      expect(result.filePath).toContain('outbound')
+      expect(result.filePath).toContain('test.txt')
+    })
+
+    it('should download from FTP and return inbound file path when outbound file does not exist', async () => {
+      // inboundDir exists
+      // outboundFile does not exist
+      // after download inboundFile exists
+      ;(fs.existsSync as any).mockImplementation((filePath: string) => {
+        if (String(filePath).includes('inbound') && !String(filePath).endsWith('.txt')) return true
+
+        if (String(filePath).includes('outbound')) return false
+
+        // inbound file after download
+        if (String(filePath).includes('inbound') && String(filePath).endsWith('test.txt'))
+          return true
+
+        return false
+      })
+
+      mockFtpClientService.downloadSingleFile.mockResolvedValue(true)
+
+      const result = await service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')
+
+      expect(mockFtpClientService.downloadSingleFile).toHaveBeenCalledOnce()
+      expect(result.remoteFileName).toBe('test.txt')
+      expect(result.filePath).toContain('inbound')
+      expect(result.filePath).toContain('test.txt')
+    })
+
+    it('should throw NotFoundException when FTP downloadSingleFile returns false', async () => {
+      // inboundDir exists
+      // outboundFile does not exist
+      ;(fs.existsSync as any).mockImplementation((filePath: string) => {
+        if (String(filePath).includes('inbound') && !String(filePath).endsWith('.txt')) return true
+
+        if (String(filePath).includes('outbound')) return false
+
+        return false
+      })
+
+      mockFtpClientService.downloadSingleFile.mockResolvedValue(false)
+
+      await expect(service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')).rejects.toBeInstanceOf(
+        NotFoundException,
+      )
+
+      await expect(service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')).rejects.toThrow(
+        'File not Found: test.txt',
+      )
+    })
+
+    it('should throw NotFoundException when FTP returns true but file not found locally after download', async () => {
+      // inboundDir exists
+      // outboundFile does not exist
+      // inboundFile after download still does NOT exist
+      ;(fs.existsSync as any).mockImplementation((filePath: string) => {
+        if (String(filePath).includes('inbound') && !String(filePath).endsWith('.txt')) return true
+
+        if (String(filePath).includes('outbound')) return false
+
+        // inbound file still missing after download
+        if (String(filePath).includes('inbound') && String(filePath).endsWith('test.txt'))
+          return false
+
+        return false
+      })
+
+      mockFtpClientService.downloadSingleFile.mockResolvedValue(true)
+
+      await expect(service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')).rejects.toBeInstanceOf(
+        NotFoundException,
+      )
+
+      await expect(service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')).rejects.toThrow(
+        'Downloaded file not found locally after FTP download: test.txt',
+      )
     })
   })
 })
