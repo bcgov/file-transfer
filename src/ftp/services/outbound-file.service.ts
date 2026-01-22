@@ -43,9 +43,13 @@ export class FtpOutboundService {
     fs.writeFileSync(tempFilePath, file.buffer)
     if (fs.existsSync(sentFilePath)) {
       this.logger.log(`Temporary file created at ${tempFilePath}`)
-      throw new ConflictException(
-        `File ${file.originalname} has already been sent. Duplicate files are not allowed.`,
-      )
+      return {
+        statusCode: 201,
+        status: RESPONSE_STATUS.DELIVERED,
+        message: 'File already uploded to the destination server',
+        fileName: file.originalname,
+        destinationId: destinationId,
+      }
       // return { status: RESPONSE_STATUS.FAILED, statusCode: 409, message: `File ${file.originalname} has already been sent. Duplicate files are not allowed.` }
     }
 
@@ -62,6 +66,7 @@ export class FtpOutboundService {
         status: RESPONSE_STATUS.DELIVERED,
         message: craFtpResponse?.message,
         fileName: file.originalname,
+        destinationId: destinationId,
       }
     } else {
       fs.unlinkSync(tempFilePath) // delete temp file on failure
@@ -113,10 +118,8 @@ export class FtpOutboundService {
 
   async listFiles(destinationId: string) {
     const files = await this.ftpClientService.listFiles(csa_remoteDir)
-    console.log('files----------->', files)
 
     const result = files.map((eachFile) => {
-      console.log('each file', eachFile)
       return {
         fileName: eachFile.name,
         size: eachFile.size,
