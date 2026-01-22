@@ -1,12 +1,18 @@
-import { Injectable, Logger, ConflictException } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
 import { FtpClientService } from './ftp-client.service'
 import { COMMON_CONSTANT } from '../../common/common.constant'
 import { UploadFileInterface } from '../interfaces/outbound.interface'
 
-const { local_inboundDir, local_outboundDir, cra_remoteDir, csa_remoteDir, RESPONSE_STATUS } =
-  COMMON_CONSTANT
+const {
+  local_inboundDir,
+  local_outboundDir,
+  cra_remoteDir,
+  csa_remoteDir,
+  RESPONSE_STATUS,
+  LOCAL_DIRECTORY,
+} = COMMON_CONSTANT
 
 @Injectable()
 export class FtpOutboundService {
@@ -21,8 +27,8 @@ export class FtpOutboundService {
     )
     // encrypt file buffer in memory before saving to disk or uploading
 
-    const tempDirPath = path.join(local_outboundDir, `${destinationId}`, 'temp')
-    const sentDirPath = path.join(local_outboundDir, `${destinationId}`, 'sent')
+    const tempDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.temp)
+    const sentDirPath = path.join(local_outboundDir, destinationId, LOCAL_DIRECTORY.outbound)
 
     // Ensure directories exist
     ;[tempDirPath, sentDirPath].forEach((dir) => {
@@ -37,9 +43,13 @@ export class FtpOutboundService {
     fs.writeFileSync(tempFilePath, file.buffer)
     if (fs.existsSync(sentFilePath)) {
       this.logger.log(`Temporary file created at ${tempFilePath}`)
-      throw new ConflictException(
-        `File ${file.originalname} has already been sent. Duplicate files are not allowed.`,
-      )
+      return {
+        statusCode: 201,
+        status: RESPONSE_STATUS.DELIVERED,
+        message: 'File already uploded to the destination server',
+        fileName: file.originalname,
+        destinationId: destinationId,
+      }
       // return { status: RESPONSE_STATUS.FAILED, statusCode: 409, message: `File ${file.originalname} has already been sent. Duplicate files are not allowed.` }
     }
 
@@ -56,10 +66,53 @@ export class FtpOutboundService {
         status: RESPONSE_STATUS.DELIVERED,
         message: craFtpResponse?.message,
         fileName: file.originalname,
+        destinationId: destinationId,
       }
     } else {
       fs.unlinkSync(tempFilePath) // delete temp file on failure
       throw new Error(`Failed to upload file to CRA FTP server: ${craFtpResponse?.message}`)
+    }
+  }
+
+  async checkFileDeliveryStatus(destinationId: string, fileName: string) {
+    const localSentFilePath = path.join(
+      local_outboundDir,
+      destinationId,
+      LOCAL_DIRECTORY.outbound,
+      fileName,
+    )
+    const localTepmFilePath = path.join(
+      local_outboundDir,
+      destinationId,
+      LOCAL_DIRECTORY.temp,
+      fileName,
+    )
+    console.log('File Exist on local Result', fs.existsSync(localSentFilePath))
+    if (fs.existsSync(localSentFilePath)) {
+      return {
+        status: RESPONSE_STATUS.DELIVERED,
+        statusCode: 200,
+        messge: 'File Uploded Successfuly to the Destination',
+      }
+    } else {
+      const isFileExistOnRemote = await this.ftpClientService.checkFileExist(
+        cra_remoteDir,
+        fileName,
+      )
+
+      this.logger.log(`File ${fileName} Exist on Remote`, isFileExistOnRemote)
+      if (!isFileExistOnRemote) {
+        return { status: RESPONSE_STATUS.FAILED, statusCode: 404, message: 'File not Found' }
+      }
+      if (fs.existsSync(localTepmFilePath)) {
+        this.logger.log(`File ${fileName} has been move from temp to sent Directory`)
+        fs.renameSync(localTepmFilePath, localSentFilePath)
+      }
+      return {
+        status: RESPONSE_STATUS.DELIVERED,
+        statusCode: 200,
+        message: 'File Uploded successfuly to the Destination',
+      }
     }
   }
 

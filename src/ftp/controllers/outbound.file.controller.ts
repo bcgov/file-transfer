@@ -8,6 +8,7 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  Param,
 } from '@nestjs/common'
 import { FtpOutboundService } from '../services/outbound-file.service'
 import { CreateFileDto } from '../dto/outbound.file.dto'
@@ -78,6 +79,23 @@ export class FtpOutboundController {
         error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
       )
     }
+  }
+
+  @Get('transfers/:destinationId/:fileName')
+  async checkFileDeliveryStatus(
+    @Param('destinationId') destinationId: string,
+    @Param('fileName') fileName: string,
+  ) {
+    this.logger.log(
+      `Received data in params for File Delivery Status, destinationId : ${destinationId}, fileName: ${fileName}`,
+    )
+    if (!destinationId || !fileName) {
+      throw new BadRequestException('destinationId or fileName is missing in param')
+    }
+    if (!DESTINATION_ID.includes(destinationId)) {
+      throw new BadRequestException('destinationId is invalid, Please use valid destinationId')
+    }
+    return this.FtpOutboundService.checkFileDeliveryStatus(destinationId, fileName)
   }
 
   @Get('download')

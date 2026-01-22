@@ -29,6 +29,18 @@ export class FtpClientService {
     return client
   }
 
+  async checkFileExist(cra_remoteDir: string, fileName: string) {
+    const client = await this.getClient()
+
+    try {
+      const files = await client.list(cra_remoteDir)
+      return files.some((eachFile) => eachFile.name === fileName)
+    } catch (error) {
+      console.error('Error while checking File Exist on Remote Server', error)
+      return false
+    }
+  }
+
   async uploadFile(localFilePath: string, remoteDir: string, remoteFileName: string) {
     console.log('uploadFile ftp clent', localFilePath, remoteDir, remoteFileName)
     const client = await this.getClient()

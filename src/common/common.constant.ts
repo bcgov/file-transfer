@@ -7,5 +7,10 @@ export const COMMON_CONSTANT = {
     DELIVERED: 'DELIVERED',
     FAILED: 'FAILED',
   },
+  LOCAL_DIRECTORY: {
+    outbound: 'outbound',
+    temp: 'temp',
+    inbound: 'inbound',
+  },
   DESTINATION_ID: ['cra-ftp'],
 }
