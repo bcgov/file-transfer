@@ -1,0 +1,125 @@
+name: CI (PR + Manual) - file-transfer
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - "**"
+
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Target env label for manual runs (informational only for CI)"
+        type: choice
+        required: false
+        options: [dev, test, prod]
+        default: dev
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+# Keep default minimal; Trivy job overrides to allow SARIF upload
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: App Tests
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Detect lockfile
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f package-lock.json || -f npm-shrinkwrap.json || -f yarn.lock ]]; then
+            echo "has_lock=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_lock=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node (with cache)
+        if: steps.lock.outputs.has_lock == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Setup Node (no cache)
+        if: steps.lock.outputs.has_lock != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f package-lock.json ]]; then
+            npm ci
+          else
+            echo "package-lock.json not found; running npm install (report-only)."
+            npm install
+          fi
+
+      - name: Run tests with coverage (if present)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if npm run -s | grep -q '^  test:coverage'; then
+            npm run test:coverage
+          else
+            echo "No test:coverage script yet."
+          fi
+        continue-on-error: true
+
+      - name: Find cobertura coverage files
+        id: cov
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+
+          files=()
+          for f in coverage/**/coverage.cobertura.xml coverage/**/cobertura-coverage.xml coverage/**/*.xml; do
+            [[ -f "$f" ]] && files+=("$f")
+          done
+
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          (IFS=,; echo "list=${files[*]}") >> "$GITHUB_OUTPUT"
+
+          echo "Coverage files:"
+          printf ' - %s\n' "${files[@]}"
+
+      - name: Code Coverage Summary
+        if: steps.cov.outputs.found == 'true'
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: ${{ steps.cov.outputs.list }}
+          badge: true
+          format: markdown
+          output: both
+          fail_below_min: false
+
+      - name: Add coverage to job summary
+        if: steps.cov.outputs.found == 'true'
+        shell: bash
+        run: |
+          echo "## Coverage Summary" >> "$GITHUB_STEP_SUMMARY"
+          cat code-coverage-results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: No coverage yet
+        if: steps.cov.outputs.found != 'true'
+        shell: bash
+        run: |
+          echo "## Coverage Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "No Cobertura coverage files found. Once tests output Cobertura XML into ./coverage/, this will report automatically." >> "$GITHUB_STEP_SUMMARY"
