@@ -15,6 +15,8 @@ vi.mock('fs', () => ({
   writeFileSync: vi.fn(),
   renameSync: vi.fn(),
   unlinkSync: vi.fn(),
+  readdirSync: vi.fn(),
+  statSync: vi.fn(),
 }))
 
 describe('FtpOutboundService', () => {
@@ -27,6 +29,8 @@ describe('FtpOutboundService', () => {
     listFiles: vi.fn(),
     downloadSingleFile: vi.fn(),
     ftpHealthCheck: vi.fn(),
+    listAllLocalFiles: vi.fn()
+
   }
 
   const mockFile = {
@@ -41,7 +45,7 @@ describe('FtpOutboundService', () => {
 
   describe('uploadFileToCra', () => {
     it(`should upload file successfully and move it to${LOCAL_DIRECTORY.outbound}  folder`, async () => {
-      ;(fs.existsSync as any).mockReturnValue(false)
+      ; (fs.existsSync as any).mockReturnValue(false)
 
       mockFtpClientService.uploadFile.mockResolvedValue({
         code: 226,
@@ -63,7 +67,7 @@ describe('FtpOutboundService', () => {
     })
 
     it('should throw error when FTP upload fails', async () => {
-      ;(fs.existsSync as any)
+      ; (fs.existsSync as any)
         .mockReturnValueOnce(true)
         .mockReturnValueOnce(true)
         .mockReturnValueOnce(false)
@@ -86,7 +90,7 @@ describe('FtpOutboundService', () => {
   //  FIXED TESTS BELOW (ONLY THIS SECTION CHANGED)
   describe('FileDeliverStatus', () => {
     it(`should return SUCCESS when file exists in local ${LOCAL_DIRECTORY.outbound} directory`, async () => {
-      ;(fs.existsSync as any).mockImplementation((filePath: string) =>
+      ; (fs.existsSync as any).mockImplementation((filePath: string) =>
         filePath.includes(LOCAL_DIRECTORY.outbound),
       )
 
@@ -96,7 +100,7 @@ describe('FtpOutboundService', () => {
     })
 
     it('should return FAILED when file not found locally and not on remote FTP', async () => {
-      ;(fs.existsSync as any).mockReturnValue(false)
+      ; (fs.existsSync as any).mockReturnValue(false)
 
       mockFtpClientService.checkFileExist.mockResolvedValue(false)
 
@@ -108,7 +112,7 @@ describe('FtpOutboundService', () => {
     })
 
     it(`should move file from ${LOCAL_DIRECTORY.temp} to ${LOCAL_DIRECTORY.outbound} and return SUCCESS when file exists on remote`, async () => {
-      ;(fs.existsSync as any).mockImplementation((filePath: string) =>
+      ; (fs.existsSync as any).mockImplementation((filePath: string) =>
         filePath.includes(LOCAL_DIRECTORY.temp),
       )
 
@@ -124,7 +128,7 @@ describe('FtpOutboundService', () => {
     })
 
     it(`should return SUCCESS when file exists on remote but ${LOCAL_DIRECTORY.temp} file does not exist`, async () => {
-      ;(fs.existsSync as any).mockReturnValue(false)
+      ; (fs.existsSync as any).mockReturnValue(false)
 
       mockFtpClientService.checkFileExist.mockResolvedValue(true)
 
@@ -185,7 +189,7 @@ describe('FtpOutboundService', () => {
     it('should create inbound directory if it does not exist and return outbound file if already exists', async () => {
       // inboundDir does not exist -> mkdirSync should be called
       // outboundFile exists -> should return outbound file path
-      ;(fs.existsSync as any).mockImplementation((filePath: string) => {
+      ; (fs.existsSync as any).mockImplementation((filePath: string) => {
         if (String(filePath).includes('inbound')) return false
         if (String(filePath).includes('outbound')) return true
         return false
@@ -205,7 +209,7 @@ describe('FtpOutboundService', () => {
       // inboundDir exists
       // outboundFile does not exist
       // after download inboundFile exists
-      ;(fs.existsSync as any).mockImplementation((filePath: string) => {
+      ; (fs.existsSync as any).mockImplementation((filePath: string) => {
         if (String(filePath).includes('inbound') && !String(filePath).endsWith('.txt')) return true
 
         if (String(filePath).includes('outbound')) return false
@@ -230,7 +234,7 @@ describe('FtpOutboundService', () => {
     it('should throw NotFoundException when FTP downloadSingleFile returns false', async () => {
       // inboundDir exists
       // outboundFile does not exist
-      ;(fs.existsSync as any).mockImplementation((filePath: string) => {
+      ; (fs.existsSync as any).mockImplementation((filePath: string) => {
         if (String(filePath).includes('inbound') && !String(filePath).endsWith('.txt')) return true
 
         if (String(filePath).includes('outbound')) return false
@@ -253,7 +257,7 @@ describe('FtpOutboundService', () => {
       // inboundDir exists
       // outboundFile does not exist
       // inboundFile after download still does NOT exist
-      ;(fs.existsSync as any).mockImplementation((filePath: string) => {
+      ; (fs.existsSync as any).mockImplementation((filePath: string) => {
         if (String(filePath).includes('inbound') && !String(filePath).endsWith('.txt')) return true
 
         if (String(filePath).includes('outbound')) return false
@@ -305,4 +309,88 @@ describe('FtpOutboundService', () => {
       })
     })
   })
+
+  // History to list all local files
+
+  describe('listAllLocalFiles', () => {
+
+    it('should return inbound and outbound file history', () => {
+      // Arrange
+      ; (fs.existsSync as any).mockReturnValue(true)
+
+        ; (fs.readdirSync as any).mockImplementation((dirPath: string) => {
+          if (dirPath.includes('outbound')) {
+            return ['batch-001', 'batch-002']
+          }
+          if (dirPath.includes('inbound')) {
+            return ['response-001']
+          }
+          return []
+        })
+
+        ; (fs.statSync as any).mockImplementation(() => ({
+          isFile: () => true,
+          size: 256000,
+          mtime: new Date('2025-01-09T14:30:00Z'),
+        }))
+
+      // Act
+      const result = service.listAllLocalFiles('csa-ftp')
+
+      // Assert
+      expect(result).toEqual({
+        status: 'SUCCESS',
+        destinationId: 'csa-ftp',
+        outbound: [
+          {
+            fileName: 'batch-001',
+            size: 256000,
+            deliveredAt: '2025-01-09T14:30:00.000Z',
+          },
+          {
+            fileName: 'batch-002',
+            size: 256000,
+            deliveredAt: '2025-01-09T14:30:00.000Z',
+          },
+        ],
+        inbound: [
+          {
+            fileName: 'response-001',
+            size: 256000,
+            downloadedAt: '2025-01-09T14:30:00.000Z',
+          },
+        ],
+      })
+    })
+
+    it('should return empty arrays when directories exist but have no files', () => {
+      ; (fs.existsSync as any).mockReturnValue(true)
+        ; (fs.readdirSync as any).mockReturnValue([])
+
+      const result = service.listAllLocalFiles('csa-ftp')
+
+      expect(result).toEqual({
+        status: RESPONSE_STATUS.SUCCESS,
+        destinationId: 'csa-ftp',
+        outbound: [],
+        inbound: [],
+      })
+    })
+
+    it('should return empty arrays when directories do not exist', () => {
+      ; (fs.existsSync as any).mockReturnValue(false)
+
+      const result = service.listAllLocalFiles('csa-ftp')
+
+      expect(result).toEqual({
+        status: RESPONSE_STATUS.SUCCESS,
+        destinationId: 'csa-ftp',
+        outbound: [],
+        inbound: [],
+      })
+
+      expect(fs.readdirSync).not.toHaveBeenCalled()
+    })
+  })
+
 })

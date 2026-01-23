@@ -14,7 +14,7 @@ const { RESPONSE_STATUS, LOCAL_DIRECTORY } = COMMON_CONSTANT
 export class FtpOutboundService {
   private readonly logger = new Logger(FtpOutboundService.name)
 
-  constructor(private readonly ftpClientService: FtpClientService) {}
+  constructor(private readonly ftpClientService: FtpClientService) { }
 
   async uploadFileToCra(request: UploadFileInterface) {
     const { file, destinationId, fileName } = request
@@ -26,12 +26,12 @@ export class FtpOutboundService {
     const tempDirPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.temp)
     const sentDirPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.outbound)
 
-    // Ensure directories exist
-    ;[tempDirPath, sentDirPath].forEach((dir) => {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true })
-      }
-    })
+      // Ensure directories exist
+      ;[tempDirPath, sentDirPath].forEach((dir) => {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true })
+        }
+      })
     const tempFilePath = path.join(tempDirPath, file.originalname)
     const sentFilePath = path.join(sentDirPath, file.originalname)
 
@@ -170,4 +170,55 @@ export class FtpOutboundService {
       }
     }
   }
+
+   listAllLocalFiles(destinationId: string) {
+    const localInboundPath = path.join(
+      LOCAL_STORAGE_DIR,
+      destinationId,
+      LOCAL_DIRECTORY.inbound,
+    )
+
+    const localOutboundPath = path.join(
+      LOCAL_STORAGE_DIR,
+      destinationId,
+      LOCAL_DIRECTORY.outbound,
+    )
+
+    const outboundFiles = this.readFiles(localOutboundPath, 'deliveredAt')
+    const inboundFiles = this.readFiles(localInboundPath, 'downloadedAt')
+
+    return {
+      status: RESPONSE_STATUS.SUCCESS,
+      destinationId,
+      outbound: outboundFiles,
+      inbound: inboundFiles,
+    }
+  }
+
+
+  readFiles(dirPath: string, dateKey: string) {
+    if (!fs.existsSync(dirPath)) {
+      return []
+    }
+
+    return fs
+      .readdirSync(dirPath)
+      .map((fileName) => {
+        const fullPath = path.join(dirPath, fileName)
+        const stats = fs.statSync(fullPath)
+
+        if (!stats.isFile()) {
+          return null
+        }
+
+        return {
+          fileName,
+          size: stats.size,
+          [dateKey]: stats.mtime.toISOString(),
+        }
+      })
+      .filter(Boolean)
+  }
+
+
 }

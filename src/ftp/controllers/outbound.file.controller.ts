@@ -27,7 +27,7 @@ const { DESTINATION_ID, RESPONSE_STATUS } = COMMON_CONSTANT
 @Controller()
 export class FtpOutboundController {
   private readonly logger = new Logger(FtpOutboundController.name)
-  constructor(private readonly FtpOutboundService: FtpOutboundService) {}
+  constructor(private readonly FtpOutboundService: FtpOutboundService) { }
 
   @Post('transfers')
   @ApiOperation({ summary: 'Upload file to FTP Server' })
@@ -120,7 +120,7 @@ export class FtpOutboundController {
         return new BadRequestException('destinationId is required in params')
       }
       if (!DESTINATION_ID.includes(destinationId)) {
-        return new BadRequestException('Destination id is invalid')
+        throw new BadRequestException('Destination id is invalid')
       }
       return await this.FtpOutboundService.listFiles(destinationId)
     } catch (error) {
@@ -185,5 +185,33 @@ export class FtpOutboundController {
         error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
       )
     }
+  }
+
+  @Get('destinations/:destinationId/history')
+  listAllLocalFiles(@Param('destinationId') destinationId: string) {
+
+    try {
+      if (!destinationId) {
+        throw new BadRequestException('destinationId is required')
+      }
+      if (!DESTINATION_ID.includes(destinationId)) {
+        throw new BadRequestException('Destination id is invalid')
+      }
+
+      return this.FtpOutboundService.listAllLocalFiles(destinationId)
+    } catch (error) {
+      this.logger.error('Error in list All Local Files API', error)
+
+      // Keep your standard response structure
+      throw new HttpException(
+        {
+          status: RESPONSE_STATUS.FAILED,
+          statusCode: error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+          message: error?.message || 'Internal Server Error',
+        },
+        error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      )
+    }
+
   }
 }
