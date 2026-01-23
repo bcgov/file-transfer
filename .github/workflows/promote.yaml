@@ -1,0 +1,236 @@
+name: Promote (Build Image + Update GitOps)
+
+on:
+  push:
+    branches: [dev, test, main]
+    # Optional: keep this if you only want promote on code changes.
+    # If you want *any* push to these branches to promote, remove `paths:`.
+    paths:
+      - "**"
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (dev/test/prod)"
+        type: choice
+        required: true
+        options: [dev, test, prod]
+
+      tag:
+        description: "Image tag to promote (manual runs). If empty and build_images=true, defaults to <env>-<branch>-<sha7>."
+        type: string
+        required: false
+
+      build_images:
+        description: "Build & push image (false = promote existing tag only; requires tag)"
+        type: boolean
+        required: false
+        default: true
+
+concurrency:
+  group: promote-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  ORG: bcgov
+
+  # ---- CHANGE THESE FOR FILE-TRANSFER ----
+  SERVICE_NAME: file-transfer
+  APP_NAME: file-transfer
+  IMAGE: ghcr.io/bcgov/file-transfer
+  # --------------------------------------
+
+  # GitOps repo ArgoCD watches
+  GITOPS_REPO: bcgov-c/tenant-gitops-dec59b
+  GITOPS_BASE_BRANCH: main
+
+  # Where overlays live in the GitOps repo
+  # Example: apps/<app-name>/overlays
+  GITOPS_OVERLAY: apps/file-transfer/overlays
+
+jobs:
+  detect:
+    name: Determine env/tag/mode
+    runs-on: ubuntu-24.04
+    outputs:
+      envname: ${{ steps.vars.outputs.envname }}
+      tag: ${{ steps.vars.outputs.tag }}
+      build_images: ${{ steps.vars.outputs.build_images }}
+      repo_safe: ${{ steps.vars.outputs.repo_safe }}
+      branch_safe: ${{ steps.vars.outputs.branch_safe }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REPO_SAFE="${GITHUB_REPOSITORY//\//-}"
+          BRANCH="${GITHUB_REF_NAME}"
+          BRANCH_SAFE="$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_.-]+/-/g' | sed -E 's/^-+|-+$//g')"
+
+          echo "repo_safe=$REPO_SAFE" >> "$GITHUB_OUTPUT"
+          echo "branch_safe=$BRANCH_SAFE" >> "$GITHUB_OUTPUT"
+
+          # ---- push (auto) ----
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            case "${GITHUB_REF_NAME}" in
+              dev)  ENVNAME="dev"  ;;
+              test) ENVNAME="test" ;;
+              main) ENVNAME="prod" ;;
+              *) echo "Unsupported branch for promotion: ${GITHUB_REF_NAME}" ; exit 1 ;;
+            esac
+
+            TAG="${ENVNAME}-${GITHUB_SHA::7}"
+            BUILD_IMAGES="true"
+
+            echo "envname=$ENVNAME" >> "$GITHUB_OUTPUT"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "build_images=$BUILD_IMAGES" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # ---- workflow_dispatch (manual) ----
+          ENVNAME="${{ inputs.environment }}"
+          TAG_IN="${{ inputs.tag }}"
+          BUILD_IMAGES="${{ inputs.build_images }}"
+
+          [[ "$ENVNAME" =~ ^(dev|test|prod)$ ]] || { echo "Invalid environment: $ENVNAME"; exit 1; }
+
+          if [[ "$BUILD_IMAGES" != "true" && -z "$TAG_IN" ]]; then
+            echo "ERROR: build_images=false requires tag (promoting existing image)."
+            exit 1
+          fi
+
+          if [[ -n "$TAG_IN" ]]; then
+            TAG="$TAG_IN"
+          else
+            TAG="${ENVNAME}-${BRANCH_SAFE}-${GITHUB_SHA::7}"
+          fi
+
+          echo "envname=$ENVNAME" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "build_images=$BUILD_IMAGES" >> "$GITHUB_OUTPUT"
+
+  build-image:
+    name: Build & Push Image
+    needs: [detect]
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && needs.detect.outputs.build_images == 'true')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.SERVICE_NAME }}:${{ needs.detect.outputs.tag }}
+
+  update-gitops:
+    name: Update GitOps overlays
+    needs: [detect, build-image]
+    if: >-
+      always() &&
+      (
+        (github.event_name == 'workflow_dispatch' && needs.detect.outputs.build_images != 'true') ||
+        (needs.build-image.result == 'success')
+      )
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          ref: ${{ env.GITOPS_BASE_BRANCH }}
+          token: ${{ secrets.GITOPS_PUSH_TOKEN }}
+          path: gitops
+          persist-credentials: false
+
+      - name: Install yq
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Update overlay image tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENV="${{ needs.detect.outputs.envname }}"
+          TAG="${{ needs.detect.outputs.tag }}"
+          FILE="gitops/${{ env.GITOPS_OVERLAY }}/${ENV}/kustomization.yaml"
+          IMAGE="${{ env.IMAGE }}"
+
+          if [[ ! -f "$FILE" ]]; then
+            echo "ERROR: Missing kustomization: $FILE"
+            exit 1
+          fi
+
+          if ! yq e '.images[]? | select(.name=="'"$IMAGE"'") | .name' "$FILE" | grep -q .; then
+            echo "ERROR: image '$IMAGE' not found in $FILE"
+            echo "INFO: current images:"
+            yq e '.images[]?.name' "$FILE" || true
+            exit 1
+          fi
+
+          yq -i '(.images[] | select(.name=="'"$IMAGE"'")).newTag = "'"$TAG"'"' "$FILE"
+          echo "Updated $IMAGE -> $TAG in $FILE"
+
+      - name: Show Git diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd gitops
+          git diff --stat
+          git diff
+
+      - name: Commit & push (dev direct, test/prod PR branch)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd gitops
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "No GitOps changes to commit."
+            exit 0
+          fi
+
+          ENV="${{ needs.detect.outputs.envname }}"
+          TAG="${{ needs.detect.outputs.tag }}"
+          REPO_SAFE="${{ needs.detect.outputs.repo_safe }}"
+          BR="promote/${ENV}/${REPO_SAFE}-${TAG}"
+
+          git remote set-url origin "https://x-access-token:${{ secrets.GITOPS_PUSH_TOKEN }}@github.com/${{ env.GITOPS_REPO }}.git"
+
+          if [[ "$ENV" == "dev" ]]; then
+            git add .
+            git commit -m "Promote to dev: ${REPO_SAFE} ${TAG}"
+            git remote set-url origin "https://x-access-token:${{ secrets.GITOPS_PUSH_TOKEN }}@github.com/${{ env.GITOPS_REPO }}.git"
+            git push origin "${{ env.GITOPS_BASE_BRANCH }}"
+            echo "Pushed dev promotion directly to GitOps main."
+            exit 0
+          fi
+
+          git checkout -b "$BR"
+          git add .
+          git commit -m "Promote to ${ENV}: ${REPO_SAFE} ${TAG}"
+          git remote set-url origin "https://x-access-token:${{ secrets.GITOPS_PUSH_TOKEN }}@github.com/${{ env.GITOPS_REPO }}.git"
+          git push -u origin "$BR"
+          echo "Created branch $BR in GitOps repo. Open a PR to ${GITOPS_BASE_BRANCH}."
