@@ -27,7 +27,7 @@ const { DESTINATION_ID, RESPONSE_STATUS } = COMMON_CONSTANT
 @Controller()
 export class FtpOutboundController {
   private readonly logger = new Logger(FtpOutboundController.name)
-  constructor(private readonly FtpOutboundService: FtpOutboundService) { }
+  constructor(private readonly FtpOutboundService: FtpOutboundService) {}
 
   @Post('transfers')
   @ApiOperation({ summary: 'Upload file to FTP Server' })
@@ -117,7 +117,7 @@ export class FtpOutboundController {
     try {
       this.logger.log('Received Requestbody in listFiles endpoint ', destinationId)
       if (!destinationId) {
-        return new BadRequestException('destinationId is required in params')
+        throw new BadRequestException('destinationId is required in params')
       }
       if (!DESTINATION_ID.includes(destinationId)) {
         throw new BadRequestException('Destination id is invalid')
@@ -172,7 +172,6 @@ export class FtpOutboundController {
       this.logger.log('Received destinationId in ftp health check', destinationId)
       return this.FtpOutboundService.ftpHealthCheck()
     } catch (error) {
-      console.log('==========>', error)
       this.logger.error('Error in ftp healthe check API', error)
 
       // Keep your standard response structure
@@ -189,7 +188,6 @@ export class FtpOutboundController {
 
   @Get('destinations/:destinationId/history')
   listAllLocalFiles(@Param('destinationId') destinationId: string) {
-
     try {
       if (!destinationId) {
         throw new BadRequestException('destinationId is required')
@@ -212,6 +210,5 @@ export class FtpOutboundController {
         error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
       )
     }
-
   }
 }

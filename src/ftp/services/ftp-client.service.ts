@@ -35,14 +35,17 @@ export class FtpClientService {
     client.close()
     return result
   }
-  async checkFileExist(outbound_dir: string, fileName: string) {
+  async checkFileExist(cra_remoteDir: string, fileName: string) {
+    const client = await this.getClient()
+
     try {
-      const client = await this.getClient()
-      const files = await client.list(outbound_dir)
+      const files = await client.list(cra_remoteDir)
       return files.some((eachFile) => eachFile.name === fileName)
     } catch (error) {
       this.logger.error('Error while checking File Exist on Remote Server', error)
       return false
+    } finally {
+      client.close()
     }
   }
 
@@ -65,7 +68,6 @@ export class FtpClientService {
       await client.downloadTo(localFilePath, remoteFilePath)
       return localFilePath
     } catch (error) {
-      // console.log('errr==========>', error)
       this.logger.error('Error while downloading file', error)
       return false
     }
