@@ -1,8 +1,4 @@
 export const COMMON_CONSTANT = {
-  cra_remoteDir: process.env.CRA_REMOTEDIR, // upload to cra
-  csa_remoteDir: process.env.CSA_REMOTEDIR, // download from cra
-  local_outboundDir: process.env.LOCAL_OUTBOUNDDIR || './storage',
-  local_inboundDir: process.env.LOCAL_INBOUND,
   RESPONSE_STATUS: {
     SUCCESS: 'SUCCESS',
     FAILED: 'FAILED',

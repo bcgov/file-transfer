@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Client } from 'basic-ftp'
-import path from 'path'
-import fs from 'fs'
 
 const { FTP_HOST, FTP_PORT, FTP_USER, FTP_PASSWORD } = process.env
 
@@ -65,26 +63,16 @@ export class FtpClientService {
     }
   }
 
-  async downloadFile(local_inboundDir: string, cra_remoteDir: string) {
-    const client = await this.getClient()
-
-    // const localDir = path.join(process.cwd(), local_inboundDir)
-    const localDir = local_inboundDir
-    if (!fs.existsSync(localDir)) {
-      fs.mkdirSync(localDir)
-    }
-    const files = await client.list(cra_remoteDir)
-    for (const file of files) {
-      if (file.isDirectory || file.name.split('.').pop() === 'tmp') continue
-      const localFilePath = path.join(localDir, file.name)
-      const remoteFilePath = `${cra_remoteDir}/${file.name}`
-      // const processedPath = `${cra_remoteDir}/processed/${file.name}`
-      const processedPath = `${cra_remoteDir}/${file.name}`
+  async downloadSingleFile(remoteFilePath: string, localFilePath: string) {
+    try {
+      const client = await this.getClient()
+      this.logger.log(`Downloading from FTP: ${remoteFilePath} -> ${localFilePath}`)
       await client.downloadTo(localFilePath, remoteFilePath)
-      // await client.ensureDir(`${cra_remoteDir}/processed`)
-      await client.rename(remoteFilePath, processedPath)
+      return localFilePath
+    } catch (error) {
+      // console.log('errr==========>', error)
+      this.logger.error('Error while downloading file', error)
+      return false
     }
-
-    return { statusCode: 200, message: 'File downloded successfuly' }
   }
 }

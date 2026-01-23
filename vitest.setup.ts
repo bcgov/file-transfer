@@ -1,0 +1,8 @@
+process.env.PORT='3000'
+process.env.FTP_HOST='3000'
+process.env.FTP_PORT='3000'
+process.env.FTP_USER='user'
+process.env.FTP_PASSWORD='password'
+process.env.OUTBOUND_DIR='DEST1'
+process.env.INBOUND_DIR='remoteDir'
+process.env.LOCAL_STORAGE_DIR='DEST1'

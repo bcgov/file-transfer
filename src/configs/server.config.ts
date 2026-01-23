@@ -1,12 +1,13 @@
-const { PORT, APP_NAME, CSA_BACKEND_API_BASE_URL } = process.env
+const { PORT, INBOUND_DIR, OUTBOUND_DIR, LOCAL_STORAGE_DIR } = process.env
 import { Logger } from '@nestjs/common'
 
 const logger = new Logger('FTP-CONFIG')
 
 const serverConfig = {
   PORT,
-  APP_NAME,
-  CSA_BACKEND_API_BASE_URL,
+  INBOUND_DIR,
+  OUTBOUND_DIR,
+  LOCAL_STORAGE_DIR,
 }
 
 for (const key in serverConfig) {
@@ -14,4 +15,10 @@ for (const key in serverConfig) {
     logger.log(`SERVER CONFIG KEY : ${key} IS MISSING IN ENV`)
     throw new Error(`SERVER CONFIG KEY: ${key} IS MISSING IN ENV`)
   }
+}
+
+export const SERVER_CONFIG = {
+  INBOUND_DIR,
+  OUTBOUND_DIR,
+  LOCAL_STORAGE_DIR,
 }
