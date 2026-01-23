@@ -26,6 +26,7 @@ describe('FtpOutboundService', () => {
     checkFileExist: vi.fn(),
     listFiles: vi.fn(),
     downloadSingleFile: vi.fn(),
+    ftpHealthCheck: vi.fn(),
   }
 
   const mockFile = {
@@ -273,6 +274,35 @@ describe('FtpOutboundService', () => {
       await expect(service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')).rejects.toThrow(
         'Downloaded file not found locally after FTP download: test.txt',
       )
+    })
+  })
+
+  // Health check test cases
+
+  describe('Health Check FTP', () => {
+    it('should return HEALTHY when remote server has files', async () => {
+      mockFtpClientService.listFiles.mockResolvedValue([{ name: 'test.txt', size: 100 }])
+
+      const result = await service.ftpHealthCheck()
+
+      expect(mockFtpClientService.listFiles).toHaveBeenCalledOnce()
+      expect(result).toEqual({
+        status: 'HEALTHY',
+        statusCode: 200,
+        message: 'Ftp Server is Healthy',
+      })
+    })
+
+    it('should return UNHEALTHY when no files found', async () => {
+      mockFtpClientService.listFiles.mockResolvedValue([])
+
+      const result = await service.ftpHealthCheck()
+
+      expect(result).toEqual({
+        status: 'UNHEALTHY',
+        statusCode: 503,
+        message: 'Ftp Server is not reachable',
+      })
     })
   })
 })

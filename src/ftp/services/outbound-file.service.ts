@@ -157,4 +157,17 @@ export class FtpOutboundService {
 
     return { filePath: localInboundFilePath, remoteFileName: fileName }
   }
+
+  async ftpHealthCheck() {
+    const files = await this.ftpClientService.listFiles(OUTBOUND_DIR)
+    if (files?.length > 0) {
+      return { status: RESPONSE_STATUS.HEALTHY, statusCode: 200, message: 'Ftp Server is Healthy' }
+    } else {
+      return {
+        status: RESPONSE_STATUS.UNHEALTHY,
+        statusCode: 503,
+        message: 'Ftp Server is not reachable',
+      }
+    }
+  }
 }

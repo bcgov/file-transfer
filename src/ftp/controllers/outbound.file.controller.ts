@@ -165,4 +165,25 @@ export class FtpOutboundController {
       )
     }
   }
+
+  @Get('destinations/:destinationId/health')
+  async ftpHealthCheck(@Param('destinationId') destinationId: string) {
+    try {
+      this.logger.log('Received destinationId in ftp health check', destinationId)
+      return this.FtpOutboundService.ftpHealthCheck()
+    } catch (error) {
+      console.log('==========>', error)
+      this.logger.error('Error in ftp healthe check API', error)
+
+      // Keep your standard response structure
+      throw new HttpException(
+        {
+          status: RESPONSE_STATUS.UNHEALTHY,
+          statusCode: error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+          message: error?.message || 'FTP server is not reachable',
+        },
+        error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      )
+    }
+  }
 }
