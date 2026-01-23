@@ -170,4 +170,44 @@ export class FtpOutboundService {
       }
     }
   }
+
+  listAllLocalFiles(destinationId: string) {
+    const localInboundPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.inbound)
+
+    const localOutboundPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.outbound)
+
+    const outboundFiles = this.readFiles(localOutboundPath, 'deliveredAt')
+    const inboundFiles = this.readFiles(localInboundPath, 'downloadedAt')
+
+    return {
+      status: RESPONSE_STATUS.SUCCESS,
+      destinationId,
+      outbound: outboundFiles,
+      inbound: inboundFiles,
+    }
+  }
+
+  readFiles(dirPath: string, dateKey: string) {
+    if (!fs.existsSync(dirPath)) {
+      return []
+    }
+
+    return fs
+      .readdirSync(dirPath)
+      .map((fileName) => {
+        const fullPath = path.join(dirPath, fileName)
+        const stats = fs.statSync(fullPath)
+
+        if (!stats.isFile()) {
+          return null
+        }
+
+        return {
+          fileName,
+          size: stats.size,
+          [dateKey]: stats.mtime.toISOString(),
+        }
+      })
+      .filter(Boolean)
+  }
 }

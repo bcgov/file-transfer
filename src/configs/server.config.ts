@@ -1,10 +1,9 @@
-const { PORT, INBOUND_DIR, OUTBOUND_DIR, LOCAL_STORAGE_DIR } = process.env
+const { INBOUND_DIR, OUTBOUND_DIR, LOCAL_STORAGE_DIR } = process.env
 import { Logger } from '@nestjs/common'
 
 const logger = new Logger('FTP-CONFIG')
 
 const serverConfig = {
-  PORT,
   INBOUND_DIR,
   OUTBOUND_DIR,
   LOCAL_STORAGE_DIR,

@@ -15,6 +15,8 @@ vi.mock('fs', () => ({
   writeFileSync: vi.fn(),
   renameSync: vi.fn(),
   unlinkSync: vi.fn(),
+  readdirSync: vi.fn(),
+  statSync: vi.fn(),
 }))
 
 describe('FtpOutboundService', () => {
@@ -27,6 +29,7 @@ describe('FtpOutboundService', () => {
     listFiles: vi.fn(),
     downloadSingleFile: vi.fn(),
     ftpHealthCheck: vi.fn(),
+    listAllLocalFiles: vi.fn(),
   }
 
   const mockFile = {
@@ -303,6 +306,86 @@ describe('FtpOutboundService', () => {
         statusCode: 503,
         message: 'Ftp Server is not reachable',
       })
+    })
+  })
+
+  // History to list all local files
+
+  describe('listAllLocalFiles', () => {
+    it('should return inbound and outbound file history', () => {
+      // Arrange
+      ;(fs.existsSync as any).mockReturnValue(true)
+      ;(fs.readdirSync as any).mockImplementation((dirPath: string) => {
+        if (dirPath.includes('outbound')) {
+          return ['batch-001', 'batch-002']
+        }
+        if (dirPath.includes('inbound')) {
+          return ['response-001']
+        }
+        return []
+      })
+      ;(fs.statSync as any).mockImplementation(() => ({
+        isFile: () => true,
+        size: 256000,
+        mtime: new Date('2025-01-09T14:30:00Z'),
+      }))
+
+      // Act
+      const result = service.listAllLocalFiles('csa-ftp')
+
+      // Assert
+      expect(result).toEqual({
+        status: 'SUCCESS',
+        destinationId: 'csa-ftp',
+        outbound: [
+          {
+            fileName: 'batch-001',
+            size: 256000,
+            deliveredAt: '2025-01-09T14:30:00.000Z',
+          },
+          {
+            fileName: 'batch-002',
+            size: 256000,
+            deliveredAt: '2025-01-09T14:30:00.000Z',
+          },
+        ],
+        inbound: [
+          {
+            fileName: 'response-001',
+            size: 256000,
+            downloadedAt: '2025-01-09T14:30:00.000Z',
+          },
+        ],
+      })
+    })
+
+    it('should return empty arrays when directories exist but have no files', () => {
+      ;(fs.existsSync as any).mockReturnValue(true)
+      ;(fs.readdirSync as any).mockReturnValue([])
+
+      const result = service.listAllLocalFiles('csa-ftp')
+
+      expect(result).toEqual({
+        status: RESPONSE_STATUS.SUCCESS,
+        destinationId: 'csa-ftp',
+        outbound: [],
+        inbound: [],
+      })
+    })
+
+    it('should return empty arrays when directories do not exist', () => {
+      ;(fs.existsSync as any).mockReturnValue(false)
+
+      const result = service.listAllLocalFiles('csa-ftp')
+
+      expect(result).toEqual({
+        status: RESPONSE_STATUS.SUCCESS,
+        destinationId: 'csa-ftp',
+        outbound: [],
+        inbound: [],
+      })
+
+      expect(fs.readdirSync).not.toHaveBeenCalled()
     })
   })
 })

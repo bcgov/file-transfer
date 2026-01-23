@@ -68,7 +68,6 @@ export class FtpClientService {
       await client.downloadTo(localFilePath, remoteFilePath)
       return localFilePath
     } catch (error) {
-      // console.log('errr==========>', error)
       this.logger.error('Error while downloading file', error)
       return false
     }
