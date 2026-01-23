@@ -172,7 +172,6 @@ export class FtpOutboundController {
       this.logger.log('Received destinationId in ftp health check', destinationId)
       return this.FtpOutboundService.ftpHealthCheck()
     } catch (error) {
-      console.log('==========>', error)
       this.logger.error('Error in ftp healthe check API', error)
 
       // Keep your standard response structure
