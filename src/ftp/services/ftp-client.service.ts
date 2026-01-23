@@ -52,14 +52,12 @@ export class FtpClientService {
   // this.logger.log('Host', this.configService.get<string>('FTP_HOST'));
 
   async listFiles(remotePath: string) {
-    const client = await this.getClient()
     try {
+      const client = await this.getClient()
       return await client.list(remotePath)
     } catch (error) {
       this.logger.error('Got Error while listing the files', error)
       return []
-    } finally {
-      client.close()
     }
   }
 

@@ -26,6 +26,7 @@ describe('FtpOutboundService', () => {
     checkFileExist: vi.fn(),
     listFiles: vi.fn(),
     downloadSingleFile: vi.fn(),
+    ftpHealthCheck: vi.fn(),
   }
 
   const mockFile = {
@@ -276,44 +277,32 @@ describe('FtpOutboundService', () => {
     })
   })
 
-  // List file endpoint Test case
-  describe('ListFiles', async () => {
-    it('It should list all the files from Remote server', async () => {
-      mockFtpClientService.listFiles.mockResolvedValue([
-        {
-          name: 'test.txt',
-          size: 656,
-          rawModifiedAt: 'Jan 20 06:19',
-        },
-      ])
+  // Health check test cases
 
-      const result = await service.listFiles('remoteDir')
+  describe('Health Check FTP', () => {
+    it('should return HEALTHY when remote server has files', async () => {
+      mockFtpClientService.listFiles.mockResolvedValue([{ name: 'test.txt', size: 100 }])
 
-      expect(result.status).toEqual('SUCCESS')
-      expect(result.statusCode).toEqual(200)
-      expect(result.files).toBeTypeOf('object')
+      const result = await service.ftpHealthCheck()
+
+      expect(mockFtpClientService.listFiles).toHaveBeenCalledOnce()
+      expect(result).toEqual({
+        status: 'HEALTHY',
+        statusCode: 200,
+        message: 'Ftp Server is Healthy',
+      })
     })
 
-    it('should return FAILED when FTP client throws an error', async () => {
-      mockFtpClientService.listFiles.mockRejectedValue(new Error('FTP connection failed'))
-
-      await expect(service.listFiles('remoteDir')).rejects.toThrow('FTP connection failed')
-    })
-
-    it('should return FAILED when remote directory does not exist', async () => {
-      mockFtpClientService.listFiles.mockRejectedValue(new Error('Directory not found'))
-
-      await expect(service.listFiles('remoteDir')).rejects.toThrow('Directory not found')
-    })
-
-    it('should return SUCCESS with empty files list when no files exist', async () => {
+    it('should return UNHEALTHY when no files found', async () => {
       mockFtpClientService.listFiles.mockResolvedValue([])
 
-      const result = await service.listFiles('remoteDir')
+      const result = await service.ftpHealthCheck()
 
-      expect(result.status).toEqual('SUCCESS')
-      expect(result.statusCode).toEqual(200)
-      expect(result.files).toEqual([])
+      expect(result).toEqual({
+        status: 'UNHEALTHY',
+        statusCode: 503,
+        message: 'Ftp Server is not reachable',
+      })
     })
   })
 })
