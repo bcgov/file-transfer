@@ -13,7 +13,7 @@ const serverConfig = {
 for (const key in serverConfig) {
   if (!serverConfig[key]) {
     logger.log(`SERVER CONFIG KEY : ${key} IS MISSING IN ENV`)
-    // throw new Error(`SERVER CONFIG KEY: ${key} IS MISSING IN ENV`)
+    throw new Error(`SERVER CONFIG KEY: ${key} IS MISSING IN ENV`)
   }
 }
 
