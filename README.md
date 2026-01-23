@@ -1,8 +1,6 @@
 # 📁 File Transfer Microservice (FTP) – NestJS
 
 ## 📌 Overview
-This project is a **File Transfer Microservice** built using **NestJS** that enables secure, reliable file exchange between systems using **FTP**.
-
 The service is designed for **system-to-system integration**, similar to **CSA ↔ CRA** style communication, where files are exchanged without human interaction.
 
 ---
@@ -45,14 +43,6 @@ v
 src/
 ├── app.module.ts
 ├── main.ts
-├── user/
-│ ├── dto/
-│ │ └── create-user.dto.ts
-│ ├── interfaces/
-│ │ └── user.interface.ts
-│ ├── user.controller.ts
-│ ├── user.service.ts
-│ └── user.module.ts
 ├── ftp/
 | ├── controllers/
 | | └── outbound.file.controller.ts
@@ -111,19 +101,10 @@ Content-Type: application/json
 📥 Download File
 GET /file-transfer/download?fileName=test.txt
 
-👤 Create User (Sample API)
-POST /user
-Content-Type: application/json
-
-{
-  "name": "Saif",
-  "email": "saif@test.com",
-  "age": 25
-}
 
 🔐 Validation & Security
 
-DTO-based validation using Joi
+DTO-based validation using class-validator
 
 Invalid requests return 400 Bad Request
 
@@ -185,6 +166,6 @@ In-memory storage used for demo (DB-ready design)
 
 👨‍💻 Author
 
-Md Saif Raza
+CSA Team
 Backend Developer – NestJS | Node.js
 
