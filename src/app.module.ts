@@ -8,12 +8,11 @@ import { AppController } from './app.controller'
 import { MetricsController } from './metrics/metrics.controller'
 import { TerminusModule } from '@nestjs/terminus'
 import { FtpModule } from './ftp/ftp.module'
-// import { HealthController } from './health.controller'
+import { HealthController } from './health/health.controller'
 
 @Module({
   imports: [ConfigModule.forRoot(), TerminusModule, FtpModule],
-  // controllers: [AppController, MetricsController, HealthController],
-  controllers: [AppController, MetricsController],
+  controllers: [AppController, MetricsController, HealthController],
   providers: [AppService],
 })
 export class AppModule {

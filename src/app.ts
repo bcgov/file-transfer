@@ -19,7 +19,9 @@ export async function bootstrap() {
   app.set('trust proxy', 1)
   app.use(metricsMiddleware)
   app.enableShutdownHooks()
-  app.setGlobalPrefix('api')
+  app.setGlobalPrefix('api', {
+    exclude: ['health'],
+  })
   app.enableVersioning({
     type: VersioningType.URI,
     prefix: 'v',
