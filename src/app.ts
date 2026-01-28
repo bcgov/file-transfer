@@ -20,7 +20,7 @@ export async function bootstrap() {
   app.use(metricsMiddleware)
   app.enableShutdownHooks()
   app.setGlobalPrefix('api', {
-    exclude: ['health'],
+    exclude: ['health', 'health/live', 'health/ready'],
   })
   app.enableVersioning({
     type: VersioningType.URI,
