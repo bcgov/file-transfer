@@ -159,7 +159,7 @@ export class FtpOutboundService {
   }
 
   async ftpHealthCheck() {
-    const files = await this.ftpClientService.listFiles(OUTBOUND_DIR)
+    const files = await this.ftpClientService.listFiles(INBOUND_DIR)
     if (files?.length > 0) {
       return { status: RESPONSE_STATUS.HEALTHY, statusCode: 200, message: 'Ftp Server is Healthy' }
     } else {

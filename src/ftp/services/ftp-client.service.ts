@@ -56,8 +56,9 @@ export class FtpClientService {
       const client = await this.getClient()
       return await client.list(remotePath)
     } catch (error) {
-      this.logger.error('Got Error while listing the files', error)
-      return []
+      this.logger.error('Got Error while listing the files', error?.stack)
+      throw new Error('Error while listing the file', error?.message)
+      // return []
     }
   }
 
