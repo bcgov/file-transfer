@@ -9,4 +9,16 @@ export class HealthController {
   check() {
     return this.health.check([])
   }
+
+  @Get('live')
+  @HealthCheck()
+  live() {
+    return this.health.check([])
+  }
+
+  @Get('ready')
+  @HealthCheck()
+  ready() {
+    return this.health.check([])
+  }
 }
