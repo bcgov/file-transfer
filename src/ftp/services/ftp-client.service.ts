@@ -11,6 +11,9 @@ export class FtpClientService {
 
   private async getClient(): Promise<Client> {
     const client = new Client()
+    // TODO: remove after debugging
+    client.ftp.verbose = process.env.FTP_DEBUG === 'true'
+
     await client.access({
       host: FTP_HOST,
       port: Number(FTP_PORT || 21),
