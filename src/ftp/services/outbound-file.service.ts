@@ -71,7 +71,7 @@ export class FtpOutboundService {
   }
 
   async checkFileDeliveryStatus(destinationId: string, fileName: string) {
-    const localSentFilePath = path.join(
+    const localOutboundFilePath = path.join(
       LOCAL_STORAGE_DIR,
       destinationId,
       LOCAL_DIRECTORY.outbound,
@@ -83,32 +83,38 @@ export class FtpOutboundService {
       LOCAL_DIRECTORY.temp,
       fileName,
     )
-    if (fs.existsSync(localSentFilePath)) {
-      return {
-        status: RESPONSE_STATUS.SUCCESS,
-        statusCode: 200,
-        messge: 'File Delivered Successfuly to the Destination',
-      }
-    } else {
-      const isFileExistOnRemote = await this.ftpClientService.checkFileExist(OUTBOUND_DIR, fileName)
+    let localDeliveryStatus = false
+    if (fs.existsSync(localOutboundFilePath)) {
+      localDeliveryStatus = true
+    }
+    const isFileExistOnRemote = await this.ftpClientService.checkFileExist(OUTBOUND_DIR, fileName)
 
-      this.logger.log(`File ${fileName} Exist on Remote`, isFileExistOnRemote)
-      if (!isFileExistOnRemote) {
-        return { status: RESPONSE_STATUS.FAILED, statusCode: 404, message: 'File not Found' }
-      }
-      if (fs.existsSync(localTepmFilePath)) {
-        this.logger.log(`File ${fileName} has been move from temp to sent Directory`)
-        fs.renameSync(localTepmFilePath, localSentFilePath)
-      }
+    this.logger.log(`File ${fileName} Exist on Remote`, isFileExistOnRemote)
+    if (!isFileExistOnRemote) {
       return {
-        status: RESPONSE_STATUS.SUCCESS,
-        statusCode: 200,
-        message: 'File Delivered successfuly to the Destination',
+        status: RESPONSE_STATUS.FAILED,
+        statusCode: 404,
+        message: 'File not Found',
+        local: localDeliveryStatus ? 'Delivered' : 'Not Delivered',
+        remote: isFileExistOnRemote ? 'Delivered' : 'Not Delivered',
       }
+    }
+    if (fs.existsSync(localTepmFilePath)) {
+      this.logger.log(`File ${fileName} has been move from temp to sent Directory`)
+      fs.renameSync(localTepmFilePath, localOutboundFilePath)
+    }
+
+    console.log('Local Delivery Status: ', localDeliveryStatus)
+    return {
+      status: RESPONSE_STATUS.SUCCESS,
+      statusCode: 200,
+      message: 'File Delivered successfuly to the Destination',
+      local: localDeliveryStatus ? 'Delivered' : 'Not Delivered',
+      remote: isFileExistOnRemote ? 'Delivered' : 'Not Delivered',
     }
   }
 
-  async listFiles(destinationId: string) {
+  async listRemoteFiles(destinationId: string) {
     const files = await this.ftpClientService.listFiles(INBOUND_DIR)
     const result = files.map((eachFile) => {
       return {
@@ -126,19 +132,15 @@ export class FtpOutboundService {
     }
   }
 
-  async downloadFileFromLocalOrFtp(destinationId: string, fileName: string) {
+  async downloadRemoteFile(destinationId: string, fileName: string) {
     const localInboundDir = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.inbound)
-    const localOutbounDir = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.outbound)
     const localInboundFilePath = `${localInboundDir}/${fileName}`
-    const localOutbounFilePath = `${localOutbounDir}/${fileName}`
     const remoteFilePath = `${INBOUND_DIR}/${fileName}`
 
     if (!fs.existsSync(localInboundDir)) {
       fs.mkdirSync(localInboundDir)
     }
-    if (fs.existsSync(localOutbounFilePath)) {
-      return { filePath: localOutbounFilePath, remoteFileName: fileName }
-    }
+
     const isFileDownloadable = await this.ftpClientService.downloadSingleFile(
       remoteFilePath,
       localInboundFilePath,
@@ -153,6 +155,17 @@ export class FtpOutboundService {
       throw new NotFoundException(
         `Downloaded file not found locally after FTP download: ${fileName}`,
       )
+    }
+
+    return { filePath: localInboundFilePath, remoteFileName: fileName }
+  }
+
+  async downloadLocalFile(destinationId: string, fileName: string) {
+    const localInboundDir = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.inbound)
+    const localInboundFilePath = `${localInboundDir}/${fileName}`
+
+    if (!fs.existsSync(localInboundFilePath)) {
+      throw new NotFoundException(`Downloaded file not found locally: ${fileName}`)
     }
 
     return { filePath: localInboundFilePath, remoteFileName: fileName }

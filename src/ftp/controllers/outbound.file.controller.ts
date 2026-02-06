@@ -71,7 +71,7 @@ export class FtpOutboundController {
 
       return await this.FtpOutboundService.uploadFileToCra({ file, destinationId, fileName })
     } catch (error) {
-      this.logger.error('Error uploading file to CRA FTP', error)
+      this.logger.error('Error uploading file to CRA FTP', error?.stack, error?.message)
       throw new HttpException(
         {
           status: RESPONSE_STATUS.FAILED,
@@ -100,7 +100,11 @@ export class FtpOutboundController {
       }
       return this.FtpOutboundService.checkFileDeliveryStatus(destinationId, fileName)
     } catch (error) {
-      this.logger.error('Error while checking the delivery status of filefrom remote server', error)
+      this.logger.error(
+        'Error while checking the delivery status of filefrom remote server',
+        error?.stack,
+        error?.message,
+      )
       throw new HttpException(
         {
           status: RESPONSE_STATUS.FAILED,
@@ -113,18 +117,22 @@ export class FtpOutboundController {
   }
 
   @Get('destinations/:destinationId/remote-files')
-  async listFiles(@Param('destinationId') destinationId: string) {
+  async listRemoteFiles(@Param('destinationId') destinationId: string) {
     try {
-      this.logger.log('Received Requestbody in listFiles endpoint ', destinationId)
+      this.logger.log('Received Requestbody in listRemoteFiles endpoint ', destinationId)
       if (!destinationId) {
         throw new BadRequestException('destinationId is required in params')
       }
       if (!DESTINATION_ID.includes(destinationId)) {
         throw new BadRequestException('Destination id is invalid')
       }
-      return await this.FtpOutboundService.listFiles(destinationId)
+      return await this.FtpOutboundService.listRemoteFiles(destinationId)
     } catch (error) {
-      this.logger.error('Error while listing the files from remote server', error)
+      this.logger.error(
+        'Error while listing the files from remote server',
+        error?.stack,
+        error?.message,
+      )
       throw new HttpException(
         {
           status: RESPONSE_STATUS.FAILED,
@@ -136,8 +144,8 @@ export class FtpOutboundController {
     }
   }
 
-  @Get('destinations/:destinationId/files/download/:fileName')
-  async downloadFile(
+  @Get('destinations/:destinationId/remote-file/download/:fileName')
+  async downloadRemoteFile(
     @Param('destinationId') destinationId: string,
     @Param('fileName') fileName: string,
     @Res() res: Response,
@@ -146,13 +154,43 @@ export class FtpOutboundController {
       if (!destinationId || !fileName) {
         throw new BadRequestException('destinationId and fileName are required')
       }
-      const { filePath, remoteFileName } = await this.FtpOutboundService.downloadFileFromLocalOrFtp(
+      const { filePath, remoteFileName } = await this.FtpOutboundService.downloadRemoteFile(
         destinationId,
         fileName,
       )
       return res.download(filePath, remoteFileName)
     } catch (error) {
-      this.logger.error('Error in downloadFile API', error)
+      this.logger.error('Error in downloadFile API', error?.stack, error?.message)
+
+      // Keep your standard response structure
+      throw new HttpException(
+        {
+          status: RESPONSE_STATUS.FAILED,
+          statusCode: error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+          message: error?.message || 'Download failed',
+        },
+        error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      )
+    }
+  }
+
+  @Get('destinations/:destinationId/local-file/download/:fileName')
+  async downloadLocalFile(
+    @Param('destinationId') destinationId: string,
+    @Param('fileName') fileName: string,
+    @Res() res: Response,
+  ) {
+    try {
+      if (!destinationId || !fileName) {
+        throw new BadRequestException('destinationId and fileName are required')
+      }
+      const { filePath, remoteFileName } = await this.FtpOutboundService.downloadLocalFile(
+        destinationId,
+        fileName,
+      )
+      return res.download(filePath, remoteFileName)
+    } catch (error) {
+      this.logger.error('Error in downloadLocalFile API', error?.stack, error?.message)
 
       // Keep your standard response structure
       throw new HttpException(
@@ -172,7 +210,7 @@ export class FtpOutboundController {
       this.logger.log('Received destinationId in ftp health check', destinationId)
       return this.FtpOutboundService.ftpHealthCheck()
     } catch (error) {
-      this.logger.error('Error in ftp healthe check API', error)
+      this.logger.error('Error in ftp healthe check API', error?.stack, error?.message)
 
       // Keep your standard response structure
       throw new HttpException(
@@ -186,7 +224,7 @@ export class FtpOutboundController {
     }
   }
 
-  @Get('destinations/:destinationId/history')
+  @Get('destinations/:destinationId/local-files')
   listAllLocalFiles(@Param('destinationId') destinationId: string) {
     try {
       if (!destinationId) {
@@ -198,7 +236,7 @@ export class FtpOutboundController {
 
       return this.FtpOutboundService.listAllLocalFiles(destinationId)
     } catch (error) {
-      this.logger.error('Error in list All Local Files API', error)
+      this.logger.error('Error in list All Local Files API', error?.stack, error?.message)
 
       // Keep your standard response structure
       throw new HttpException(
