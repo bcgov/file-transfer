@@ -88,14 +88,16 @@ describe('FtpOutboundService', () => {
 
   //  FIXED TESTS BELOW (ONLY THIS SECTION CHANGED)
   describe('FileDeliverStatus', () => {
-    it(`should return SUCCESS when file exists in local ${LOCAL_DIRECTORY.outbound} directory`, async () => {
+    it(`should return FAILED when file exists locally but not on remote FTP`, async () => {
       ;(fs.existsSync as any).mockImplementation((filePath: string) =>
         filePath.includes(LOCAL_DIRECTORY.outbound),
       )
 
+      mockFtpClientService.checkFileExist.mockResolvedValue(false)
+
       const result = await service.checkFileDeliveryStatus('DEST1', 'test.txt')
 
-      expect(result.status).toEqual(RESPONSE_STATUS.SUCCESS)
+      expect(result.status).toEqual(RESPONSE_STATUS.FAILED)
     })
 
     it('should return FAILED when file not found locally and not on remote FTP', async () => {
@@ -142,7 +144,7 @@ describe('FtpOutboundService', () => {
   })
 
   // List file endpoint Test case
-  describe('ListFiles', async () => {
+  describe('ListRemoteFiles', async () => {
     it('It should list all the files from Remote server', async () => {
       mockFtpClientService.listFiles.mockResolvedValue([
         {
@@ -152,7 +154,7 @@ describe('FtpOutboundService', () => {
         },
       ])
 
-      const result = await service.listFiles('remoteDir')
+      const result = await service.listRemoteFiles('remoteDir')
 
       expect(result.status).toEqual('SUCCESS')
       expect(result.statusCode).toEqual(200)
@@ -162,19 +164,19 @@ describe('FtpOutboundService', () => {
     it('should return FAILED when FTP client throws an error', async () => {
       mockFtpClientService.listFiles.mockRejectedValue(new Error('FTP connection failed'))
 
-      await expect(service.listFiles('remoteDir')).rejects.toThrow('FTP connection failed')
+      await expect(service.listRemoteFiles('remoteDir')).rejects.toThrow('FTP connection failed')
     })
 
     it('should return FAILED when remote directory does not exist', async () => {
       mockFtpClientService.listFiles.mockRejectedValue(new Error('Directory not found'))
 
-      await expect(service.listFiles('remoteDir')).rejects.toThrow('Directory not found')
+      await expect(service.listRemoteFiles('remoteDir')).rejects.toThrow('Directory not found')
     })
 
     it('should return SUCCESS with empty files list when no files exist', async () => {
       mockFtpClientService.listFiles.mockResolvedValue([])
 
-      const result = await service.listFiles('remoteDir')
+      const result = await service.listRemoteFiles('remoteDir')
 
       expect(result.status).toEqual('SUCCESS')
       expect(result.statusCode).toEqual(200)
@@ -184,23 +186,29 @@ describe('FtpOutboundService', () => {
 
   // Download file
 
-  describe('FtpOutboundService - downloadFileFromLocalOrFtp', () => {
-    it('should create inbound directory if it does not exist and return outbound file if already exists', async () => {
-      // inboundDir does not exist -> mkdirSync should be called
-      // outboundFile exists -> should return outbound file path
+  describe('FtpOutboundService - downloadRemoteFile', () => {
+    it('should create inbound directory if it does not exist and download file from FTP', async () => {
+      // inboundDir does not exist
+      // inboundFile does not exist initially
       ;(fs.existsSync as any).mockImplementation((filePath: string) => {
-        if (String(filePath).includes('inbound')) return false
-        if (String(filePath).includes('outbound')) return true
+        if (String(filePath).includes('inbound') && !String(filePath).endsWith('.txt')) return false
+
+        // file exists AFTER download
+        if (String(filePath).includes('inbound') && String(filePath).endsWith('test.txt'))
+          return true
+
         return false
       })
 
-      const result = await service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')
+      mockFtpClientService.downloadSingleFile.mockResolvedValue(true)
+
+      const result = await service.downloadRemoteFile('DEST1', 'test.txt')
 
       expect(fs.mkdirSync).toHaveBeenCalledOnce()
-      expect(mockFtpClientService.downloadSingleFile).not.toHaveBeenCalled()
+      expect(mockFtpClientService.downloadSingleFile).toHaveBeenCalledOnce()
 
       expect(result.remoteFileName).toBe('test.txt')
-      expect(result.filePath).toContain('outbound')
+      expect(result.filePath).toContain('inbound')
       expect(result.filePath).toContain('test.txt')
     })
 
@@ -222,7 +230,7 @@ describe('FtpOutboundService', () => {
 
       mockFtpClientService.downloadSingleFile.mockResolvedValue(true)
 
-      const result = await service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')
+      const result = await service.downloadRemoteFile('DEST1', 'test.txt')
 
       expect(mockFtpClientService.downloadSingleFile).toHaveBeenCalledOnce()
       expect(result.remoteFileName).toBe('test.txt')
@@ -243,11 +251,11 @@ describe('FtpOutboundService', () => {
 
       mockFtpClientService.downloadSingleFile.mockResolvedValue(false)
 
-      await expect(service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')).rejects.toBeInstanceOf(
+      await expect(service.downloadRemoteFile('DEST1', 'test.txt')).rejects.toBeInstanceOf(
         NotFoundException,
       )
 
-      await expect(service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')).rejects.toThrow(
+      await expect(service.downloadRemoteFile('DEST1', 'test.txt')).rejects.toThrow(
         'File not Found: test.txt',
       )
     })
@@ -270,11 +278,11 @@ describe('FtpOutboundService', () => {
 
       mockFtpClientService.downloadSingleFile.mockResolvedValue(true)
 
-      await expect(service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')).rejects.toBeInstanceOf(
+      await expect(service.downloadRemoteFile('DEST1', 'test.txt')).rejects.toBeInstanceOf(
         NotFoundException,
       )
 
-      await expect(service.downloadFileFromLocalOrFtp('DEST1', 'test.txt')).rejects.toThrow(
+      await expect(service.downloadRemoteFile('DEST1', 'test.txt')).rejects.toThrow(
         'Downloaded file not found locally after FTP download: test.txt',
       )
     })

@@ -26,6 +26,7 @@ RUN apt-get update \
      curl \
      iputils-ping \
      telnet \
+     nano \
   && rm -rf /var/lib/apt/lists/*
 
 
