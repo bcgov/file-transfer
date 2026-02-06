@@ -86,7 +86,6 @@ export class FtpClientService {
       return localFilePath
     } catch (error) {
       this.logger.error('Error while downloading file', error?.stack, error?.message)
-      // throw new Error(`FTP download failed: ${error?.message || 'Unknown error'}`)
       return null
     } finally {
       client.close()
