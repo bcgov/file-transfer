@@ -89,8 +89,8 @@ export class FtpOutboundService {
     }
     const isFileExistOnRemote = await this.ftpClientService.checkFileExist(OUTBOUND_DIR, fileName)
 
-    this.logger.log(`File ${fileName} Exist on Remote`, isFileExistOnRemote)
     if (!isFileExistOnRemote) {
+      this.logger.log(`File ${fileName} Not  Exist on Remote`, isFileExistOnRemote)
       return {
         status: RESPONSE_STATUS.FAILED,
         statusCode: 404,
