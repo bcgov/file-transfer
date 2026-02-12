@@ -28,7 +28,7 @@ RUN npm run build
 WORKDIR /opt/ent-toolkit
 
 # Copy Entrust jar
-COPY ent-toolkit/lib/enttoolkit.jar ./lib/
+COPY ent-toolkit/lib ./lib/
 
 # Copy Java source
 COPY ent-toolkit/src ./src
