@@ -144,7 +144,7 @@ export class FtpOutboundController {
     }
   }
 
-  @Get('destinations/:destinationId/remote-file/download/:fileName')
+  @Get('destinations/:destinationId/remote/inbound/files/:fileName')
   async downloadRemoteFile(
     @Param('destinationId') destinationId: string,
     @Param('fileName') fileName: string,
@@ -174,7 +174,7 @@ export class FtpOutboundController {
     }
   }
 
-  @Get('destinations/:destinationId/local-file/download/:fileName')
+  @Get('destinations/:destinationId/local/inbound/files/:fileName')
   async downloadLocalFile(
     @Param('destinationId') destinationId: string,
     @Param('fileName') fileName: string,

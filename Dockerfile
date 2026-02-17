@@ -23,9 +23,12 @@ WORKDIR /app
 #RUN apt-get update && apt-get install -y curl --no-install-recommends && rm -rf /var/lib/apt/lists/*
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-     curl \
-     iputils-ping \
-     telnet \
+  curl \
+  iputils-ping \
+  telnet \
+  nano \
+  ftp \
+  lftp \
   && rm -rf /var/lib/apt/lists/*
 
 
