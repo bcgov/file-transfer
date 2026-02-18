@@ -1,12 +1,13 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
+import { spawn } from 'child_process'
 import { FtpClientService } from './ftp-client.service'
 import { COMMON_CONSTANT } from '../../common/common.constant'
 import { UploadFileInterface } from '../interfaces/outbound.interface'
 import { SERVER_CONFIG } from 'src/configs/server.config'
 
-const { LOCAL_STORAGE_DIR, INBOUND_DIR, OUTBOUND_DIR } = SERVER_CONFIG
+const { LOCAL_STORAGE_DIR, INBOUND_DIR, OUTBOUND_DIR, CRA_PUB_CERT_PATH } = SERVER_CONFIG
 
 const { RESPONSE_STATUS, LOCAL_DIRECTORY } = COMMON_CONSTANT
 
@@ -24,44 +25,46 @@ export class FtpOutboundService {
     // encrypt file buffer in memory before saving to disk or uploading
 
     const tempDirPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.temp)
-    const sentDirPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.outbound)
+    const outboundDirPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.outbound)
 
     // Ensure directories exist
-    ;[tempDirPath, sentDirPath].forEach((dir) => {
+    ;[tempDirPath, outboundDirPath].forEach((dir) => {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true })
       }
     })
-    const tempFilePath = path.join(tempDirPath, file.originalname)
-    const sentFilePath = path.join(sentDirPath, file.originalname)
+    const tempFilePath = path.join(tempDirPath, `${file.originalname}.p7m`)
 
     // fs.mkdirSync(path.dirname(localFilePath), { recursive: true })
-    fs.writeFileSync(tempFilePath, file.buffer)
-    if (fs.existsSync(sentFilePath)) {
-      this.logger.log(`Temporary file created at ${tempFilePath}`)
+    const encryptedFileName = await this.encryptBuffer(file.buffer, tempFilePath)
+    const outboundFilePath = path.join(outboundDirPath, encryptedFileName)
+    // fs.writeFileSync(tempFilePath, file.buffer)
+    if (fs.existsSync(outboundFilePath)) {
+      this.logger.log(
+        `File ${encryptedFileName} already uploaded to destination server, local outbound Path: ${outboundDirPath}, skipping upload.`,
+      )
       return {
         statusCode: 201,
         status: RESPONSE_STATUS.SUCCESS,
         message: 'File already uploded to the destination server',
-        fileName: file.originalname,
+        fileName: encryptedFileName,
         destinationId: destinationId,
       }
-      // return { status: RESPONSE_STATUS.FAILED, statusCode: 409, message: `File ${file.originalname} has already been sent. Duplicate files are not allowed.` }
     }
 
     const craFtpResponse = await this.ftpClientService.uploadFile(
       tempFilePath,
       OUTBOUND_DIR,
-      file.originalname,
+      encryptedFileName,
     )
     this.logger.log(`CRA FTP Response: ${JSON.stringify(craFtpResponse)}`)
     if (craFtpResponse?.code === 226) {
-      fs.renameSync(tempFilePath, path.join(sentDirPath, file.originalname))
+      fs.renameSync(tempFilePath, path.join(outboundDirPath, encryptedFileName))
       return {
         statusCode: craFtpResponse?.code,
         status: RESPONSE_STATUS.SUCCESS,
         message: craFtpResponse?.message,
-        fileName: file.originalname,
+        fileName: encryptedFileName,
         destinationId: destinationId,
       }
     } else {
@@ -222,5 +225,43 @@ export class FtpOutboundService {
         }
       })
       .filter(Boolean)
+  }
+
+  private encryptBuffer(buffer: Buffer, outputPath: string): Promise<string> {
+    console.log(
+      'Encrypting file buffer using OpenSSL with CRA public certificate...',
+      outputPath,
+      CRA_PUB_CERT_PATH,
+      buffer.length,
+    )
+    return new Promise((resolve, reject) => {
+      const openssl = spawn('openssl', [
+        'cms',
+        '-encrypt',
+        '-binary',
+        '-aes256',
+        '-out',
+        outputPath,
+        '-outform',
+        'DER',
+        CRA_PUB_CERT_PATH,
+      ])
+
+      // Send buffer to OpenSSL stdin
+      openssl.stdin.write(buffer)
+      openssl.stdin.end()
+
+      openssl.stderr.on('data', (data) => {
+        console.error(`OpenSSL error: ${data}`)
+      })
+
+      openssl.on('close', (code) => {
+        if (code === 0) {
+          resolve(path.basename(outputPath))
+        } else {
+          reject(new Error(`OpenSSL exited with code ${code}`))
+        }
+      })
+    })
   }
 }

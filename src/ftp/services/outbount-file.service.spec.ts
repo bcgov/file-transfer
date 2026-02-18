@@ -19,6 +19,30 @@ vi.mock('fs', () => ({
   statSync: vi.fn(),
 }))
 
+vi.mock('child_process', () => {
+  return {
+    spawn: vi.fn(() => {
+      return {
+        stdin: {
+          write: vi.fn(),
+          end: vi.fn(),
+        },
+        stdout: {
+          on: vi.fn(),
+        },
+        stderr: {
+          on: vi.fn(),
+        },
+        on: vi.fn((event: string, callback: any) => {
+          if (event === 'close') {
+            callback(0) // simulate successful OpenSSL exit
+          }
+        }),
+      }
+    }),
+  }
+})
+
 describe('FtpOutboundService', () => {
   let service: FtpOutboundService
 
@@ -58,7 +82,6 @@ describe('FtpOutboundService', () => {
       })
 
       expect(fs.mkdirSync).toHaveBeenCalled()
-      expect(fs.writeFileSync).toHaveBeenCalled()
       expect(mockFtpClientService.uploadFile).toHaveBeenCalledOnce()
       expect(fs.renameSync).toHaveBeenCalled()
 
