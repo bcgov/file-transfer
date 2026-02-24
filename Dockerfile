@@ -1,49 +1,48 @@
 # syntax=docker/dockerfile:1
 
 
-# 1️ Dependencies stage
+# 1 Dependencies stage
 
 FROM node:24.12-slim AS deps
-
 WORKDIR /app
-
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --no-update-notifier --omit=dev
 
-
-# 2️ Build stage (Nest + Java + OpenSSL 1.1.1)
+# 2 Build stage (Nest + Java compile)
 FROM node:24.12-slim AS build
 
 WORKDIR /app
 
-# ---- Install build dependencies ----
+# ---- Install JDK for compilation ----
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    wget \
-    zlib1g-dev \
     openjdk-17-jdk-headless \
  && rm -rf /var/lib/apt/lists/*
 
-# ---- Install OpenSSL 1.1.1w (STATIC build) ----
-RUN wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz && \
-    tar -xzf openssl-1.1.1w.tar.gz && \
-    cd openssl-1.1.1w && \
-    ./config --prefix=/opt/openssl-1.1.1 \
-             --openssldir=/opt/openssl-1.1.1 \
-             no-shared \
-             zlib && \
-    make -j$(nproc) && \
-    make install_sw
-
-# ---- Nest build ----
+# ---- Nest.js build ----
 COPY package.json package-lock.json ./
-RUN npm ci
-
+RUN npm ci --no-update-notifier
 COPY . .
 RUN npm run build
 
+# ---- Entrust Toolkit paths ----
+WORKDIR /opt/ent-toolkit
 
-# 3️ Runtime stage (Lean Production Image)
+# Copy Entrust jar
+COPY ent-toolkit/lib ./lib/
+
+# Copy Java source
+COPY ent-toolkit/src ./src
+
+# Create output directory
+RUN mkdir -p classes
+
+# ---- Compile Encode.java ----
+RUN javac \
+  -cp "./lib/enttoolkit.jar" \
+  -d ./classes \
+  ./src/com/entrust/toolkit/examples/pkcs7/*.java
+
+# 3️ Runtime stage (lean)
 FROM node:24.12-slim
 
 ENV NODE_ENV=production
@@ -51,22 +50,20 @@ WORKDIR /app
 
 # ---- Runtime tools + JRE only ----
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openjdk-17-jre-headless \
     curl \
     iputils-ping \
+    telnet \
+    nano \
+    ftp \
+    lftp \
+    openjdk-17-jre-headless \
  && rm -rf /var/lib/apt/lists/*
 
-# ---- Copy OpenSSL 1.1.1 from build ----
-COPY --from=build /opt/openssl-1.1.1 /opt/openssl-1.1.1
-
-# Ensure OpenSSL 1.1.1 is used instead of system 3.x
-ENV PATH="/opt/openssl-1.1.1/bin:$PATH"
-
-# ---- Copy Nest runtime ----
+# ---- Copy Nest.js runtime ----
 COPY --from=deps  /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 
-# ---- Copy Entrust Toolkit ----
+# ---- Copy Entrust Toolkit runtime ----
 COPY --from=build /opt/ent-toolkit /opt/ent-toolkit
 
 # ---- Permissions ----

@@ -35,14 +35,15 @@ export class FtpClientService {
       // Only keep ensureDir if CRA allows directory creation
       await client.ensureDir(remoteDir)
 
-      const tempPath = `${remoteDir}/${remoteFileName}.tmp`
+      // const tempPath = `${remoteDir}/${remoteFileName}.tmp`
       const finalPath = `${remoteDir}/${remoteFileName}`
 
-      const result = await client.uploadFrom(localFilePath, tempPath)
-      await client.rename(tempPath, finalPath)
+      // const result = await client.uploadFrom(localFilePath, tempPath)
+      // await client.rename(tempPath, finalPath)
 
       this.logger.log(`Uploaded file: ${finalPath}`)
-      return result
+      return { code: 226, message: 'File stored locally, Skipping upload to the CRA' }
+      // return result
     } catch (error) {
       this.logger.error('Error while uploading file', error?.stack, error?.message)
       throw new Error(`FTP upload failed: ${error?.message || 'Unknown error'}`)
