@@ -7,7 +7,7 @@ import { COMMON_CONSTANT } from '../../common/common.constant'
 import { UploadFileInterface } from '../interfaces/outbound.interface'
 import { SERVER_CONFIG } from 'src/configs/server.config'
 
-const { LOCAL_STORAGE_DIR, INBOUND_DIR, OUTBOUND_DIR, CRA_PUB_CERT_PATH } = SERVER_CONFIG
+const { LOCAL_STORAGE_DIR, INBOUND_DIR, OUTBOUND_DIR, CRA_PUB_CERT_PATH, CRA_PRIVATE_KEY_PATH } = SERVER_CONFIG
 
 const { RESPONSE_STATUS, LOCAL_DIRECTORY } = COMMON_CONSTANT
 
@@ -15,7 +15,7 @@ const { RESPONSE_STATUS, LOCAL_DIRECTORY } = COMMON_CONSTANT
 export class FtpOutboundService {
   private readonly logger = new Logger(FtpOutboundService.name)
 
-  constructor(private readonly ftpClientService: FtpClientService) {}
+  constructor(private readonly ftpClientService: FtpClientService) { }
 
   async uploadFileToCra(request: UploadFileInterface) {
     const { file, destinationId, fileName } = request
@@ -27,12 +27,12 @@ export class FtpOutboundService {
     const tempDirPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.temp)
     const outboundDirPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.outbound)
 
-    // Ensure directories exist
-    ;[tempDirPath, outboundDirPath].forEach((dir) => {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true })
-      }
-    })
+      // Ensure directories exist
+      ;[tempDirPath, outboundDirPath].forEach((dir) => {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true })
+        }
+      })
     const tempFilePath = path.join(tempDirPath, `${file.originalname}.p7m`)
 
     // fs.mkdirSync(path.dirname(localFilePath), { recursive: true })
@@ -159,19 +159,31 @@ export class FtpOutboundService {
         `Downloaded file not found locally after FTP download: ${fileName}`,
       )
     }
+    const decryptedFileName = fileName.replace(/\.p7m$/, '')
 
-    return { filePath: localInboundFilePath, remoteFileName: fileName }
+    const decryptedFilePath = `${localInboundDir}/${decryptedFileName}`
+
+    await this.decryptFile(localInboundFilePath, decryptedFilePath)
+
+    this.logger.log(`The File ${fileName} downloded and stored at ${localInboundFilePath} & decrypted as ${decryptedFileName}`)
+
+    return { filePath: decryptedFilePath, decryptedFileName: decryptedFileName }
   }
 
   async downloadLocalFile(destinationId: string, fileName: string) {
+    this.logger.log(`Received Request for local file ${fileName} download`)
     const localInboundDir = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.inbound)
+    const decryptedFileName = fileName.replace(/\.p7m$/, '')
     const localInboundFilePath = `${localInboundDir}/${fileName}`
+    const decryptedFilePath = `${localInboundDir}/${decryptedFileName}`
 
     if (!fs.existsSync(localInboundFilePath)) {
       throw new NotFoundException(`Downloaded file not found locally: ${fileName}`)
     }
+    this.decryptFile(localInboundFilePath, decryptedFileName)
+    this.logger.log(`Local File ${fileName} Downloded successfully`)
 
-    return { filePath: localInboundFilePath, remoteFileName: fileName }
+    return { filePath: localInboundFilePath, decryptedFileName: decryptedFileName }
   }
 
   async ftpHealthCheck() {
@@ -228,12 +240,8 @@ export class FtpOutboundService {
   }
 
   private encryptBuffer(buffer: Buffer, outputPath: string): Promise<string> {
-    console.log(
-      'Encrypting file buffer using OpenSSL with CRA public certificate...',
-      outputPath,
-      CRA_PUB_CERT_PATH,
-      buffer.length,
-    )
+    this.logger.log(`Encrypting file buffer start & stored path: ${outputPath}`)
+
     return new Promise((resolve, reject) => {
       const openssl = spawn('openssl', [
         'cms',
@@ -252,7 +260,7 @@ export class FtpOutboundService {
       openssl.stdin.end()
 
       openssl.stderr.on('data', (data) => {
-        console.error(`OpenSSL error: ${data}`)
+        this.logger.error(`OpenSSL error: ${data}`)
       })
 
       openssl.on('close', (code) => {
@@ -263,5 +271,33 @@ export class FtpOutboundService {
         }
       })
     })
+  }
+
+  private decryptFile(inputFilePath: string, outputFilePath: string) {
+
+    return new Promise((resolve, reject) => {
+      const openssl = spawn('openssl', [
+        'smime',
+        '-decrypt',
+        '-binary',                 // IMPORTANT for CRA files
+        '-inform', 'DER',          // Your file is DER
+        '-in', inputFilePath,
+        '-inkey', CRA_PRIVATE_KEY_PATH,
+        '-out', outputFilePath
+      ]);
+
+      openssl.stderr.on('data', (data) => {
+        this.logger.error(`OpenSSL error: ${data}`)
+      })
+
+      openssl.on('close', (code) => {
+        if (code === 0) {
+          resolve(outputFilePath)
+        } else {
+          reject(new Error(`OpenSSL exited with code ${code}`))
+        }
+      })
+    })
+
   }
 }

@@ -11,6 +11,7 @@ import {
   Param,
   Res,
 } from '@nestjs/common'
+import fs from 'fs'
 import { Response } from 'express'
 import { FtpOutboundService } from '../services/outbound-file.service'
 import { CreateFileDto } from '../dto/outbound.file.dto'
@@ -27,7 +28,7 @@ const { DESTINATION_ID, RESPONSE_STATUS } = COMMON_CONSTANT
 @Controller()
 export class FtpOutboundController {
   private readonly logger = new Logger(FtpOutboundController.name)
-  constructor(private readonly FtpOutboundService: FtpOutboundService) {}
+  constructor(private readonly FtpOutboundService: FtpOutboundService) { }
 
   @Post('transfers')
   @ApiOperation({ summary: 'Upload file to FTP Server' })
@@ -154,11 +155,19 @@ export class FtpOutboundController {
       if (!destinationId || !fileName) {
         throw new BadRequestException('destinationId and fileName are required')
       }
-      const { filePath, remoteFileName } = await this.FtpOutboundService.downloadRemoteFile(
+      const { filePath } = await this.FtpOutboundService.downloadRemoteFile(
         destinationId,
         fileName,
       )
-      return res.download(filePath, remoteFileName)
+
+      const stream = fs.createReadStream(filePath)
+
+      stream.pipe(res)
+
+      stream.on('close', async () => {
+        await fs.promises.unlink(filePath)
+      })
+      // return res.download(filePath, decryptedFileName)
     } catch (error) {
       this.logger.error('Error in downloadFile API', error?.stack, error?.message)
 
@@ -184,11 +193,19 @@ export class FtpOutboundController {
       if (!destinationId || !fileName) {
         throw new BadRequestException('destinationId and fileName are required')
       }
-      const { filePath, remoteFileName } = await this.FtpOutboundService.downloadLocalFile(
+      const { filePath } = await this.FtpOutboundService.downloadLocalFile(
         destinationId,
         fileName,
       )
-      return res.download(filePath, remoteFileName)
+
+      const stream = fs.createReadStream(filePath)
+
+      stream.pipe(res)
+
+      stream.on('close', async () => {
+        await fs.promises.unlink(filePath)
+      })
+      // return res.download(filePath, remoteFileName)
     } catch (error) {
       this.logger.error('Error in downloadLocalFile API', error?.stack, error?.message)
 
