@@ -92,8 +92,8 @@ export class FtpOutboundService {
     }
     const isFileExistOnRemote = await this.ftpClientService.checkFileExist(OUTBOUND_DIR, fileName)
 
-    this.logger.log(`File ${fileName} Exist on Remote`, isFileExistOnRemote)
     if (!isFileExistOnRemote) {
+      this.logger.log(`File ${fileName} Not  Exist on Remote`, isFileExistOnRemote)
       return {
         status: RESPONSE_STATUS.FAILED,
         statusCode: 404,
@@ -107,7 +107,7 @@ export class FtpOutboundService {
       fs.renameSync(localTepmFilePath, localOutboundFilePath)
     }
 
-    console.log('Local Delivery Status: ', localDeliveryStatus)
+    this.logger.log('Local Delivery Status: ', localDeliveryStatus)
     return {
       status: RESPONSE_STATUS.SUCCESS,
       statusCode: 200,
@@ -180,10 +180,10 @@ export class FtpOutboundService {
     if (!fs.existsSync(localInboundFilePath)) {
       throw new NotFoundException(`Downloaded file not found locally: ${fileName}`)
     }
-    this.decryptFile(localInboundFilePath, decryptedFileName)
+    this.decryptFile(localInboundFilePath, decryptedFilePath)
     this.logger.log(`Local File ${fileName} Downloded successfully`)
 
-    return { filePath: localInboundFilePath, decryptedFileName: decryptedFileName }
+    return { filePath: decryptedFilePath, decryptedFileName: decryptedFileName }
   }
 
   async ftpHealthCheck() {
