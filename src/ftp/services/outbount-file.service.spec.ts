@@ -230,7 +230,7 @@ describe('FtpOutboundService', () => {
       expect(fs.mkdirSync).toHaveBeenCalledOnce()
       expect(mockFtpClientService.downloadSingleFile).toHaveBeenCalledOnce()
 
-      expect(result.remoteFileName).toBe('test.txt')
+      expect(result.decryptedFileName).toBe('test.txt')
       expect(result.filePath).toContain('inbound')
       expect(result.filePath).toContain('test.txt')
     })
@@ -256,7 +256,7 @@ describe('FtpOutboundService', () => {
       const result = await service.downloadRemoteFile('DEST1', 'test.txt')
 
       expect(mockFtpClientService.downloadSingleFile).toHaveBeenCalledOnce()
-      expect(result.remoteFileName).toBe('test.txt')
+      expect(result.decryptedFileName).toBe('test.txt')
       expect(result.filePath).toContain('inbound')
       expect(result.filePath).toContain('test.txt')
     })

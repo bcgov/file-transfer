@@ -6,30 +6,32 @@ A robust NestJS microservice for secure, automated file exchange between organiz
 ---
 
 ##  Features
-- Encrypts files in memory before uploading to FTP, stores encrypted files locally, then uploads to CRA FTP
-- Decrypts files in memory after downloading from CRA FTP, stores decrypted files locally, and returns decrypted file to client
+- Encrypts files  before uploading to FTP, stores encrypted files locally, then uploads to CRA FTP
+- Decrypts files after downloading from CRA FTP, stores encrypted files locally, and returns decrypted file to client
 - Upload files to remote FTP servers
-- Download files from remote FTP servers
+- Delivery Status end point to check file status
 - List local and remote files
+- Download files from remote FTP servers
+- Download files from local servers
 - Health check endpoints for FTP connectivity
 - Configurable via environment variables
 - API documentation via Swagger
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 This service is built with [NestJS](https://nestjs.com/) and follows a modular structure:
 
 - **Controllers:** Handle HTTP requests (upload, download, list, health, etc.)
 - **Services:**
 	- Handle FTP logic and file operations
-	- Encrypt files in memory before upload, decrypt after download
+	- Encrypt files before upload, decrypt after download
 - **DTOs & Interfaces:** Define request/response schemas
 - **Config:** Loads FTP and server settings from environment variables
 
 ---
 
-## ⚙️ Configuration
+##  Configuration
 Set the following environment variables (e.g., in a `.env` file or your deployment environment):
 
 ```
@@ -41,11 +43,13 @@ FTP_PASSWORD=<ftp-password>
 OUTBOUND_DIR=<remote-outbound-dir>
 INBOUND_DIR=<remote-inbound-dir>
 LOCAL_STORAGE_DIR=<local-storage-dir>
+CRA_PUB_CERT_PATH=<public-certificate-path>
+CRA_PRIVATE_KEY_PATH=<private-key-path>
 ```
 
 ---
 
-## 🛠️ Setup & Run
+##  Setup & Run
 
 1. **Install dependencies:**
 	 ```bash
@@ -60,12 +64,12 @@ LOCAL_STORAGE_DIR=<local-storage-dir>
 
 ---
 
-## 📚 API Endpoints
+##  API Endpoints
 
 
 ### File Upload
 - `POST /api/transfers`
-  - Encrypts the uploaded flat file in memory, stores it locally, then uploads the encrypted file to the CRA FTP server.
+  - Encrypts the uploaded flat file , stores it locally, then uploads the encrypted file to the CRA FTP server.
   - **Body:** `multipart/form-data` with `file`, `destinationId`, `fileName`
 
 ### File Delivery Status
@@ -73,7 +77,7 @@ LOCAL_STORAGE_DIR=<local-storage-dir>
    - This will ensure file is successfully uploaded to CRA or not
 ### File Download
 - `GET /api/destinations/:destinationId/remote/inbound/files/:fileName`
-  - Downloads the encrypted file from the CRA FTP server, decrypts it in memory, stores the decrypted file locally, and returns the decrypted file to the client.
+  - Downloads the encrypted file from the CRA FTP server, stores the ecrypted file locally, then decrypt & returns the decrypted file to the client.
 - `GET /api/destinations/:destinationId/local/inbound/:fileName`
   - Download a file from local storage.
 
@@ -89,7 +93,7 @@ LOCAL_STORAGE_DIR=<local-storage-dir>
 
 ---
 
-## 🧩 Project Structure
+##  Project Structure
 
 ```
 src/
@@ -106,7 +110,7 @@ src/
 
 ---
 
-## 🧪 Testing
+##  Testing
 
 Run unit and integration tests:
 ```bash
@@ -115,24 +119,24 @@ npm run test
 
 ---
 
-## 📄 License
+##  License
 
 This project is licensed under the MIT License.
 
 ---
 
-## 🙏 Contributing
+##  Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
-## 🛡️ Security
+##  Security
 
 See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities.
 
 ---
 
-## 📞 Support
+##  Support
 
 For questions or support, please open an issue or contact the maintainers.

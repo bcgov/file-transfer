@@ -28,7 +28,7 @@ const { DESTINATION_ID, RESPONSE_STATUS } = COMMON_CONSTANT
 @Controller()
 export class FtpOutboundController {
   private readonly logger = new Logger(FtpOutboundController.name)
-  constructor(private readonly FtpOutboundService: FtpOutboundService) { }
+  constructor(private readonly FtpOutboundService: FtpOutboundService) {}
 
   @Post('transfers')
   @ApiOperation({ summary: 'Upload file to FTP Server' })
@@ -155,10 +155,7 @@ export class FtpOutboundController {
       if (!destinationId || !fileName) {
         throw new BadRequestException('destinationId and fileName are required')
       }
-      const { filePath } = await this.FtpOutboundService.downloadRemoteFile(
-        destinationId,
-        fileName,
-      )
+      const { filePath } = await this.FtpOutboundService.downloadRemoteFile(destinationId, fileName)
 
       const stream = fs.createReadStream(filePath)
 
@@ -193,10 +190,7 @@ export class FtpOutboundController {
       if (!destinationId || !fileName) {
         throw new BadRequestException('destinationId and fileName are required')
       }
-      const { filePath } = await this.FtpOutboundService.downloadLocalFile(
-        destinationId,
-        fileName,
-      )
+      const { filePath } = await this.FtpOutboundService.downloadLocalFile(destinationId, fileName)
 
       const stream = fs.createReadStream(filePath)
 
@@ -205,7 +199,6 @@ export class FtpOutboundController {
       stream.on('close', async () => {
         await fs.promises.unlink(filePath)
       })
-      // return res.download(filePath, remoteFileName)
     } catch (error) {
       this.logger.error('Error in downloadLocalFile API', error?.stack, error?.message)
 
