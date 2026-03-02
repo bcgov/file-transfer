@@ -7,7 +7,8 @@ import { COMMON_CONSTANT } from '../../common/common.constant'
 import { UploadFileInterface } from '../interfaces/outbound.interface'
 import { SERVER_CONFIG } from 'src/configs/server.config'
 
-const { LOCAL_STORAGE_DIR, INBOUND_DIR, OUTBOUND_DIR, CRA_PUB_CERT_PATH } = SERVER_CONFIG
+const { LOCAL_STORAGE_DIR, INBOUND_DIR, OUTBOUND_DIR, CRA_PUB_CERT_PATH, CRA_PRIVATE_KEY_PATH } =
+  SERVER_CONFIG
 
 const { RESPONSE_STATUS, LOCAL_DIRECTORY } = COMMON_CONSTANT
 
@@ -37,12 +38,14 @@ export class FtpOutboundService {
 
     // fs.mkdirSync(path.dirname(localFilePath), { recursive: true })
     const encryptedFileName = await this.encryptBuffer(file.buffer, tempFilePath)
+    this.logger.log(`File: ${fileName} encrypted successfully`)
     const outboundFilePath = path.join(outboundDirPath, encryptedFileName)
     // fs.writeFileSync(tempFilePath, file.buffer)
     if (fs.existsSync(outboundFilePath)) {
       this.logger.log(
         `File ${encryptedFileName} already uploaded to destination server, local outbound Path: ${outboundDirPath}, skipping upload.`,
       )
+      this.logger.log(`File: ${fileName} already uploded to the destination server`)
       return {
         statusCode: 201,
         status: RESPONSE_STATUS.SUCCESS,
@@ -107,7 +110,9 @@ export class FtpOutboundService {
       fs.renameSync(localTepmFilePath, localOutboundFilePath)
     }
 
-    console.log('Local Delivery Status: ', localDeliveryStatus)
+    this.logger.log(
+      `File ${fileName} Delivery Status local: ${localDeliveryStatus}, remote status: ${isFileExistOnRemote}`,
+    )
     return {
       status: RESPONSE_STATUS.SUCCESS,
       statusCode: 200,
@@ -121,9 +126,9 @@ export class FtpOutboundService {
     const files = await this.ftpClientService.listFiles(INBOUND_DIR)
     const result = files.map((eachFile) => {
       return {
-        fileName: eachFile.name,
-        size: eachFile.size,
-        lastModifiedAt: eachFile.rawModifiedAt,
+        fileName: eachFile?.name,
+        size: eachFile?.size,
+        lastModifiedAt: eachFile?.rawModifiedAt,
       }
     })
 
@@ -159,19 +164,35 @@ export class FtpOutboundService {
         `Downloaded file not found locally after FTP download: ${fileName}`,
       )
     }
+    const decryptedFileName = fileName.replace(/\.p7m$/, '')
 
-    return { filePath: localInboundFilePath, remoteFileName: fileName }
+    const decryptedFilePath = `${localInboundDir}/${decryptedFileName}`
+
+    await this.decryptFile(localInboundFilePath, decryptedFilePath)
+
+    this.logger.log(
+      `The File ${fileName} downloded and stored at ${localInboundFilePath} & decrypted as ${decryptedFileName}`,
+    )
+
+    return { filePath: decryptedFilePath, decryptedFileName: decryptedFileName }
   }
 
   async downloadLocalFile(destinationId: string, fileName: string) {
+    this.logger.log(`Received Request for local file ${fileName} download`)
     const localInboundDir = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.inbound)
+    const decryptedFileName = fileName.replace(/\.p7m$/, '')
     const localInboundFilePath = `${localInboundDir}/${fileName}`
+    const decryptedFilePath = `${localInboundDir}/${decryptedFileName}`
 
     if (!fs.existsSync(localInboundFilePath)) {
       throw new NotFoundException(`Downloaded file not found locally: ${fileName}`)
     }
+    await this.decryptFile(localInboundFilePath, decryptedFilePath)
+    this.logger.log(`Local File ${fileName} Decrypted successfully`)
 
-    return { filePath: localInboundFilePath, remoteFileName: fileName }
+    this.logger.log(`Local File ${fileName} Downloded successfully`)
+
+    return { filePath: decryptedFilePath, decryptedFileName: decryptedFileName }
   }
 
   async ftpHealthCheck() {
@@ -228,12 +249,8 @@ export class FtpOutboundService {
   }
 
   private encryptBuffer(buffer: Buffer, outputPath: string): Promise<string> {
-    console.log(
-      'Encrypting file buffer using OpenSSL with CRA public certificate...',
-      outputPath,
-      CRA_PUB_CERT_PATH,
-      buffer.length,
-    )
+    this.logger.log(`Encrypting file buffer start & stored path: ${outputPath}`)
+
     return new Promise((resolve, reject) => {
       const openssl = spawn('openssl', [
         'cms',
@@ -252,12 +269,46 @@ export class FtpOutboundService {
       openssl.stdin.end()
 
       openssl.stderr.on('data', (data) => {
-        console.error(`OpenSSL error: ${data}`)
+        this.logger.error(`OpenSSL error: ${data}`)
       })
 
       openssl.on('close', (code) => {
         if (code === 0) {
           resolve(path.basename(outputPath))
+        } else {
+          reject(new Error(`OpenSSL exited with code ${code}`))
+        }
+      })
+    })
+  }
+
+  private decryptFile(inputFilePath: string, outputFilePath: string) {
+    this.logger.log(
+      `File Decrytion started inputfile: ${inputFilePath} outputFile: ${outputFilePath} private key: ${CRA_PRIVATE_KEY_PATH}`,
+    )
+
+    return new Promise((resolve, reject) => {
+      const openssl = spawn('openssl', [
+        'smime',
+        '-decrypt',
+        '-binary', // IMPORTANT for CRA files
+        '-inform',
+        'DER', // Your file is DER
+        '-in',
+        inputFilePath,
+        '-inkey',
+        CRA_PRIVATE_KEY_PATH,
+        '-out',
+        outputFilePath,
+      ])
+
+      openssl.stderr.on('data', (data) => {
+        this.logger.error(`OpenSSL error: ${data}`)
+      })
+
+      openssl.on('close', (code) => {
+        if (code === 0) {
+          resolve(outputFilePath)
         } else {
           reject(new Error(`OpenSSL exited with code ${code}`))
         }

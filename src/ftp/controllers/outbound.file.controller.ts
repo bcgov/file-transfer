@@ -11,6 +11,7 @@ import {
   Param,
   Res,
 } from '@nestjs/common'
+import fs from 'fs'
 import { Response } from 'express'
 import { FtpOutboundService } from '../services/outbound-file.service'
 import { CreateFileDto } from '../dto/outbound.file.dto'
@@ -154,11 +155,16 @@ export class FtpOutboundController {
       if (!destinationId || !fileName) {
         throw new BadRequestException('destinationId and fileName are required')
       }
-      const { filePath, remoteFileName } = await this.FtpOutboundService.downloadRemoteFile(
-        destinationId,
-        fileName,
-      )
-      return res.download(filePath, remoteFileName)
+      const { filePath } = await this.FtpOutboundService.downloadRemoteFile(destinationId, fileName)
+
+      const stream = fs.createReadStream(filePath)
+
+      stream.pipe(res)
+
+      stream.on('close', async () => {
+        await fs.promises.unlink(filePath)
+      })
+      // return res.download(filePath, decryptedFileName)
     } catch (error) {
       this.logger.error('Error in downloadFile API', error?.stack, error?.message)
 
@@ -184,11 +190,15 @@ export class FtpOutboundController {
       if (!destinationId || !fileName) {
         throw new BadRequestException('destinationId and fileName are required')
       }
-      const { filePath, remoteFileName } = await this.FtpOutboundService.downloadLocalFile(
-        destinationId,
-        fileName,
-      )
-      return res.download(filePath, remoteFileName)
+      const { filePath } = await this.FtpOutboundService.downloadLocalFile(destinationId, fileName)
+
+      const stream = fs.createReadStream(filePath)
+
+      stream.pipe(res)
+
+      stream.on('close', async () => {
+        await fs.promises.unlink(filePath)
+      })
     } catch (error) {
       this.logger.error('Error in downloadLocalFile API', error?.stack, error?.message)
 
