@@ -1,4 +1,4 @@
-// ftp/dto/outbound-upload.response.dto.ts
+// transfer/dto/outbound-upload.response.dto.ts
 import { ApiProperty } from '@nestjs/swagger'
 
 export class OutboundUploadResponseDto {

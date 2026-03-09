@@ -1,4 +1,4 @@
 'use strict'
 
-export * from './ftp.config'
+export * from './s3.config'
 export * from './server.config'
