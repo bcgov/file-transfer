@@ -1,12 +1,9 @@
 import { Logger } from '@nestjs/common'
-const { INBOUND_DIR, OUTBOUND_DIR, LOCAL_STORAGE_DIR, CRA_PUB_CERT_PATH, CRA_PRIVATE_KEY_PATH } =
-  process.env
+const { LOCAL_STORAGE_DIR, CRA_PUB_CERT_PATH, CRA_PRIVATE_KEY_PATH } = process.env
 
-const logger = new Logger('FTP-CONFIG')
+const logger = new Logger('SERVER-CONFIG')
 
 const serverConfig = {
-  INBOUND_DIR,
-  OUTBOUND_DIR,
   LOCAL_STORAGE_DIR,
   CRA_PUB_CERT_PATH,
   CRA_PRIVATE_KEY_PATH,
@@ -20,8 +17,6 @@ for (const key in serverConfig) {
 }
 
 export const SERVER_CONFIG = {
-  INBOUND_DIR,
-  OUTBOUND_DIR,
   LOCAL_STORAGE_DIR,
   CRA_PUB_CERT_PATH,
   CRA_PRIVATE_KEY_PATH,

@@ -1,15 +1,27 @@
 services:
-  backend:
-    container_name: backend
-    depends_on:
-      migrations:
-        condition: service_started
-    entrypoint: sh -c "npm i && npm run start:dev"
+  minio:
+    image: minio/minio:latest
+    ports:
+      - '9000:9000'
+      - '9001:9001'
     environment:
-      NODE_ENV: development
-    image: *node-image
-    ports: ['3001:3000']
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api']
-    working_dir: '/app'
-    volumes: ['./backend:/app', '/app/node_modules']
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb local/file-transfer --ignore-existing;
+      echo 'Bucket file-transfer created';
+      "
+
+volumes:
+  minio-data:
