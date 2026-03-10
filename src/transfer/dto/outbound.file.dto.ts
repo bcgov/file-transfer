@@ -4,8 +4,4 @@ export class CreateFileDto {
   @IsString()
   @IsNotEmpty()
   fileName: string
-
-  @IsString()
-  @IsNotEmpty()
-  destinationId: string
 }

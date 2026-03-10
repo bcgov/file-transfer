@@ -31,41 +31,57 @@ export class TransferOutboundService {
         fs.mkdirSync(dir, { recursive: true })
       }
     })
-    const tempFilePath = path.join(tempDirPath, `${file.originalname}.p7m`)
 
-    const encryptedFileName = await this.encryptBuffer(file.buffer, tempFilePath)
-    this.logger.log(`File: ${fileName} encrypted successfully`)
-    const outboundFilePath = path.join(outboundDirPath, encryptedFileName)
-    if (fs.existsSync(outboundFilePath)) {
-      this.logger.log(
-        `File ${encryptedFileName} already uploaded to destination server, local outbound Path: ${outboundDirPath}, skipping upload.`,
-      )
-      this.logger.log(`File: ${fileName} already uploaded to the destination server`)
-      return {
-        statusCode: 201,
-        status: RESPONSE_STATUS.SUCCESS,
-        message: 'File already uploaded to the destination server',
-        fileName: encryptedFileName,
-        destinationId: destinationId,
+    let uploadFileName: string
+    let uploadBuffer: Buffer
+
+    if (SERVER_CONFIG.encryptionEnabled) {
+      const tempFilePath = path.join(tempDirPath, `${file.originalname}.p7m`)
+      uploadFileName = await this.encryptBuffer(file.buffer, tempFilePath)
+      this.logger.log(`File: ${fileName} encrypted successfully`)
+      uploadBuffer = fs.readFileSync(tempFilePath)
+
+      const outboundFilePath = path.join(outboundDirPath, uploadFileName)
+      if (fs.existsSync(outboundFilePath)) {
+        this.logger.log(`File ${uploadFileName} already uploaded, skipping`)
+        return {
+          statusCode: 201,
+          status: RESPONSE_STATUS.SUCCESS,
+          message: 'File already uploaded to the destination server',
+          fileName: uploadFileName,
+          destinationId,
+        }
       }
+
+      await this.s3ClientService.uploadFile(destinationId, 'OUTBOUND', uploadFileName, uploadBuffer)
+      fs.renameSync(tempFilePath, path.join(outboundDirPath, uploadFileName))
+    } else {
+      uploadFileName = file.originalname
+      uploadBuffer = file.buffer
+
+      const outboundFilePath = path.join(outboundDirPath, uploadFileName)
+      if (fs.existsSync(outboundFilePath)) {
+        this.logger.log(`File ${uploadFileName} already uploaded, skipping`)
+        return {
+          statusCode: 201,
+          status: RESPONSE_STATUS.SUCCESS,
+          message: 'File already uploaded to the destination server',
+          fileName: uploadFileName,
+          destinationId,
+        }
+      }
+
+      await this.s3ClientService.uploadFile(destinationId, 'OUTBOUND', uploadFileName, uploadBuffer)
+      fs.writeFileSync(outboundFilePath, uploadBuffer)
     }
 
-    const encryptedBuffer = fs.readFileSync(tempFilePath)
-    await this.s3ClientService.uploadFile(
-      destinationId,
-      'OUTBOUND',
-      encryptedFileName,
-      encryptedBuffer,
-    )
-    this.logger.log(`S3 upload complete for file: ${encryptedFileName}`)
-
-    fs.renameSync(tempFilePath, path.join(outboundDirPath, encryptedFileName))
+    this.logger.log(`S3 upload complete for file: ${uploadFileName}`)
     return {
       statusCode: 200,
       status: RESPONSE_STATUS.SUCCESS,
       message: 'File uploaded successfully to S3',
-      fileName: encryptedFileName,
-      destinationId: destinationId,
+      fileName: uploadFileName,
+      destinationId,
     }
   }
 
@@ -76,140 +92,109 @@ export class TransferOutboundService {
       LOCAL_DIRECTORY.outbound,
       fileName,
     )
-    const localTepmFilePath = path.join(
+    const localTempFilePath = path.join(
       LOCAL_STORAGE_DIR,
       destinationId,
       LOCAL_DIRECTORY.temp,
       fileName,
     )
-    let localDeliveryStatus = false
-    if (fs.existsSync(localOutboundFilePath)) {
-      localDeliveryStatus = true
-    }
-    const isFileExistOnRemote = await this.s3ClientService.fileExists(
+
+    const isFileOnRemote = await this.s3ClientService.fileExists(
       destinationId,
       'OUTBOUND',
       fileName,
     )
 
-    if (!isFileExistOnRemote) {
-      this.logger.log(`File ${fileName} not found on remote`, isFileExistOnRemote)
-      return {
-        status: RESPONSE_STATUS.FAILED,
-        statusCode: 404,
-        message: 'File not Found',
-        local: localDeliveryStatus ? 'Delivered' : 'Not Delivered',
-        remote: isFileExistOnRemote ? 'Delivered' : 'Not Delivered',
-      }
-    }
-    if (fs.existsSync(localTepmFilePath)) {
-      this.logger.log(`File ${fileName} has been moved from temp to outbound directory`)
-      fs.renameSync(localTepmFilePath, localOutboundFilePath)
+    if (
+      !isFileOnRemote &&
+      !fs.existsSync(localOutboundFilePath) &&
+      !fs.existsSync(localTempFilePath)
+    ) {
+      return { status: RESPONSE_STATUS.FAILED, message: 'File not found' }
     }
 
-    this.logger.log(
-      `File ${fileName} Delivery Status local: ${localDeliveryStatus}, remote status: ${isFileExistOnRemote}`,
-    )
-    return {
-      status: RESPONSE_STATUS.SUCCESS,
-      statusCode: 200,
-      message: 'File delivered successfully to the destination',
-      local: localDeliveryStatus ? 'Delivered' : 'Not Delivered',
-      remote: isFileExistOnRemote ? 'Delivered' : 'Not Delivered',
+    if (isFileOnRemote && fs.existsSync(localOutboundFilePath)) {
+      return { status: RESPONSE_STATUS.SUCCESS, message: 'File delivered successfully' }
     }
+
+    if (isFileOnRemote && fs.existsSync(localTempFilePath)) {
+      fs.renameSync(localTempFilePath, localOutboundFilePath)
+      return { status: RESPONSE_STATUS.SUCCESS, message: 'File delivered successfully' }
+    }
+
+    return { status: RESPONSE_STATUS.SUCCESS, message: 'File is pending delivery' }
   }
 
-  async listRemoteFiles(destinationId: string) {
-    const files = await this.s3ClientService.listFiles(destinationId, 'INBOUND')
-    const result = files.map((eachFile) => {
-      return {
-        fileName: eachFile.name,
-        size: eachFile.size,
-        lastModifiedAt: eachFile.lastModified,
-      }
-    })
-
+  listOutboundFiles(destinationId: string) {
+    const localOutboundPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.outbound)
     return {
       status: RESPONSE_STATUS.SUCCESS,
-      statusCode: 200,
       destinationId,
-      files: result,
+      files: this.readFiles(localOutboundPath, 'deliveredAt'),
     }
   }
 
-  async downloadRemoteFile(destinationId: string, fileName: string) {
+  async listInboundFiles(destinationId: string) {
+    const files = await this.s3ClientService.listFiles(destinationId, 'INBOUND')
+    return {
+      status: RESPONSE_STATUS.SUCCESS,
+      destinationId,
+      files: files.map((file) => ({
+        fileName: file.name,
+        size: file.size,
+        lastModifiedAt: file.lastModified,
+      })),
+    }
+  }
+
+  async downloadFile(destinationId: string, fileName: string) {
     const localInboundDir = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.inbound)
-    const localInboundFilePath = path.join(localInboundDir, fileName)
+    const localFilePath = path.join(localInboundDir, fileName)
 
     if (!fs.existsSync(localInboundDir)) {
       fs.mkdirSync(localInboundDir, { recursive: true })
     }
 
+    const tmpPath = localFilePath + '.downloading'
     try {
       const stream = await this.s3ClientService.downloadFile(destinationId, 'INBOUND', fileName)
-      await this.streamToFile(stream, localInboundFilePath)
-    } catch {
-      throw new NotFoundException(`File not Found: ${fileName}`)
+      await this.streamToFile(stream, tmpPath)
+      fs.renameSync(tmpPath, localFilePath)
+    } catch (error) {
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath)
+      if (!fs.existsSync(localFilePath)) {
+        throw new NotFoundException(`File not found: ${fileName}`)
+      }
+      this.logger.warn(
+        `S3 download failed for ${fileName}, using local cache. Error: ${error.message}`,
+      )
     }
 
-    const decryptedFileName = fileName.replace(/\.p7m$/, '')
-    const decryptedFilePath = path.join(localInboundDir, decryptedFileName)
-
-    await this.decryptFile(localInboundFilePath, decryptedFilePath)
-
-    this.logger.log(`File ${fileName} downloaded and decrypted as ${decryptedFileName}`)
-
-    return { filePath: decryptedFilePath, decryptedFileName: decryptedFileName }
-  }
-
-  async downloadLocalFile(destinationId: string, fileName: string) {
-    this.logger.log(`Received Request for local file ${fileName} download`)
-    const localInboundDir = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.inbound)
-    const decryptedFileName = fileName.replace(/\.p7m$/, '')
-    const localInboundFilePath = path.join(localInboundDir, fileName)
-    const decryptedFilePath = path.join(localInboundDir, decryptedFileName)
-
-    if (!fs.existsSync(localInboundFilePath)) {
-      throw new NotFoundException(`Downloaded file not found locally: ${fileName}`)
+    if (SERVER_CONFIG.encryptionEnabled && fileName.endsWith('.p7m')) {
+      const decryptedFileName = fileName.replace(/\.p7m$/, '')
+      const decryptedFilePath = path.join(localInboundDir, decryptedFileName)
+      await this.decryptFile(localFilePath, decryptedFilePath)
+      this.logger.log(`File ${fileName} decrypted as ${decryptedFileName}`)
+      return { filePath: decryptedFilePath, fileName: decryptedFileName }
     }
-    await this.decryptFile(localInboundFilePath, decryptedFilePath)
-    this.logger.log(`Local File ${fileName} Decrypted successfully`)
 
-    this.logger.log(`Local file ${fileName} downloaded successfully`)
-
-    return { filePath: decryptedFilePath, decryptedFileName: decryptedFileName }
+    return { filePath: localFilePath, fileName }
   }
 
   async storageHealthCheck() {
     const isHealthy = await this.s3ClientService.healthCheck()
     if (isHealthy) {
-      return { status: RESPONSE_STATUS.HEALTHY, statusCode: 200, message: 'S3 storage is healthy' }
+      return { status: RESPONSE_STATUS.SUCCESS, statusCode: 200, message: 'S3 storage is healthy' }
     } else {
       return {
-        status: RESPONSE_STATUS.UNHEALTHY,
+        status: RESPONSE_STATUS.FAILED,
         statusCode: 503,
         message: 'S3 storage is not reachable',
       }
     }
   }
 
-  listAllLocalFiles(destinationId: string) {
-    const localInboundPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.inbound)
-
-    const localOutboundPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.outbound)
-
-    const outboundFiles = this.readFiles(localOutboundPath, 'deliveredAt')
-    const inboundFiles = this.readFiles(localInboundPath, 'downloadedAt')
-
-    return {
-      status: RESPONSE_STATUS.SUCCESS,
-      destinationId,
-      outbound: outboundFiles,
-      inbound: inboundFiles,
-    }
-  }
-
-  readFiles(dirPath: string, dateKey: string) {
+  private readFiles(dirPath: string, dateKey: string) {
     if (!fs.existsSync(dirPath)) {
       return []
     }
@@ -277,16 +262,16 @@ export class TransferOutboundService {
 
   private decryptFile(inputFilePath: string, outputFilePath: string): Promise<string> {
     this.logger.log(
-      `File Decrytion started inputfile: ${inputFilePath} outputFile: ${outputFilePath} private key: ${CRA_PRIVATE_KEY_PATH}`,
+      `File decryption started inputFile: ${inputFilePath} outputFile: ${outputFilePath} privateKey: ${CRA_PRIVATE_KEY_PATH}`,
     )
 
     return new Promise((resolve, reject) => {
       const openssl = spawn('openssl', [
         'smime',
         '-decrypt',
-        '-binary', // IMPORTANT for CRA files
+        '-binary',
         '-inform',
-        'DER', // Your file is DER
+        'DER',
         '-in',
         inputFilePath,
         '-inkey',

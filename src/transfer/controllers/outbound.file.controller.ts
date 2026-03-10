@@ -11,6 +11,7 @@ import {
   Param,
   Res,
 } from '@nestjs/common'
+import path from 'path'
 import fs from 'fs'
 import { Response } from 'express'
 import { TransferOutboundService } from '../services/outbound-file.service'
@@ -19,42 +20,61 @@ import { Logger } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { File as MulterFile } from 'multer'
 import { ApiTags, ApiBody, ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger'
-import { OutboundUploadResponseDto } from '../dto/outbound.response.dto'
+import { UploadResponseDto, DeliveryStatusResponseDto } from '../dto/outbound.response.dto'
 import { COMMON_CONSTANT } from '../../common/common.constant'
 
 const { DESTINATION_ID, RESPONSE_STATUS } = COMMON_CONSTANT
 
 @ApiTags('Transfers')
-@Controller()
+@Controller('destinations/:destinationId')
 export class TransferOutboundController {
   private readonly logger = new Logger(TransferOutboundController.name)
   constructor(private readonly transferOutboundService: TransferOutboundService) {}
 
+  private validateDestinationId(destinationId: string) {
+    if (!DESTINATION_ID.includes(destinationId)) {
+      throw new BadRequestException(`Invalid destinationId, use one of [${DESTINATION_ID}]`)
+    }
+  }
+
+  private validateFileName(fileName: string) {
+    if (fileName !== path.basename(fileName) || fileName.includes('..')) {
+      throw new BadRequestException('Invalid fileName')
+    }
+  }
+
+  private getHttpStatus(error: any): number {
+    const status = error?.status
+    return typeof status === 'number' ? status : HttpStatus.INTERNAL_SERVER_ERROR
+  }
+
   @Post('transfers')
   @ApiOperation({ summary: 'Upload file to storage' })
+  @ApiResponse({ status: 200, description: 'File uploaded successfully', type: UploadResponseDto })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-    description: 'Upload a .txt file only',
+    description: 'Upload a file',
     schema: {
       type: 'object',
-      required: ['file'],
+      required: ['file', 'fileName'],
       properties: {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Text file (.txt only)',
+        },
+        fileName: {
+          type: 'string',
         },
       },
     },
   })
-  @ApiResponse({
-    status: 200,
-    description: 'File uploaded successfully',
-    type: OutboundUploadResponseDto,
-  })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadFile(@UploadedFile() file: MulterFile, @Body() body: CreateFileDto) {
-    const { fileName, destinationId } = body
+  async uploadFile(
+    @Param('destinationId') destinationId: string,
+    @UploadedFile() file: MulterFile,
+    @Body() body: CreateFileDto,
+  ) {
+    const { fileName } = body
     this.logger.log(
       `Received file: ${file?.originalname}, destinationId: ${destinationId}, fileName: ${fileName}`,
     )
@@ -62,103 +82,103 @@ export class TransferOutboundController {
       if (!file) {
         throw new BadRequestException('File is required')
       }
-      if (!destinationId || !fileName) {
-        this.logger.log('Missing destinationId or fileName in the request body')
-        throw new BadRequestException('destinationId and fileName are required in the body')
+      if (!fileName) {
+        throw new BadRequestException('fileName is required in the body')
       }
-      if (!DESTINATION_ID.includes(destinationId)) {
-        throw new BadRequestException(`destinationId is invalid use one of [${DESTINATION_ID}] it `)
-      }
+      this.validateDestinationId(destinationId)
+      this.validateFileName(fileName)
 
       return await this.transferOutboundService.uploadFile({ file, destinationId, fileName })
     } catch (error) {
       this.logger.error('Error uploading file', error?.stack, error?.message)
+      const statusCode = this.getHttpStatus(error)
       throw new HttpException(
         {
           status: RESPONSE_STATUS.FAILED,
-          statusCode: error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
+          statusCode,
           message: error?.message,
         },
-        error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
+        statusCode,
       )
     }
   }
 
-  @Get('transfers/:destinationId/:fileName')
+  @Get('transfers/outbound')
+  @ApiOperation({ summary: 'List sent files' })
+  listOutboundFiles(@Param('destinationId') destinationId: string) {
+    try {
+      this.validateDestinationId(destinationId)
+      return this.transferOutboundService.listOutboundFiles(destinationId)
+    } catch (error) {
+      this.logger.error('Error listing outbound files', error?.stack, error?.message)
+      const statusCode = this.getHttpStatus(error)
+      throw new HttpException(
+        {
+          status: RESPONSE_STATUS.FAILED,
+          statusCode,
+          message: error?.message,
+        },
+        statusCode,
+      )
+    }
+  }
+
+  @Get('transfers/inbound')
+  @ApiOperation({ summary: 'List received files' })
+  async listInboundFiles(@Param('destinationId') destinationId: string) {
+    try {
+      this.validateDestinationId(destinationId)
+      return await this.transferOutboundService.listInboundFiles(destinationId)
+    } catch (error) {
+      this.logger.error('Error listing inbound files', error?.stack, error?.message)
+      const statusCode = this.getHttpStatus(error)
+      throw new HttpException(
+        {
+          status: RESPONSE_STATUS.FAILED,
+          statusCode,
+          message: error?.message,
+        },
+        statusCode,
+      )
+    }
+  }
+
+  @Get('transfers/:fileName/status')
+  @ApiOperation({ summary: 'Check file delivery status' })
+  @ApiResponse({ status: 200, description: 'Delivery status', type: DeliveryStatusResponseDto })
   async checkFileDeliveryStatus(
     @Param('destinationId') destinationId: string,
     @Param('fileName') fileName: string,
   ) {
     try {
-      this.logger.log(
-        `Received data in params for File Delivery Status, destinationId : ${destinationId}, fileName: ${fileName}`,
-      )
-      if (!destinationId || !fileName) {
-        throw new BadRequestException('destinationId or fileName is missing in param')
-      }
-      if (!DESTINATION_ID.includes(destinationId)) {
-        throw new BadRequestException('destinationId is invalid, Please use valid destinationId')
-      }
+      this.validateDestinationId(destinationId)
+      this.validateFileName(fileName)
       return this.transferOutboundService.checkFileDeliveryStatus(destinationId, fileName)
     } catch (error) {
-      this.logger.error(
-        'Error while checking the delivery status of file from remote server',
-        error?.stack,
-        error?.message,
-      )
+      this.logger.error('Error checking delivery status', error?.stack, error?.message)
+      const statusCode = this.getHttpStatus(error)
       throw new HttpException(
         {
           status: RESPONSE_STATUS.FAILED,
-          statusCode: error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
+          statusCode,
           message: error?.message,
         },
-        error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
+        statusCode,
       )
     }
   }
 
-  @Get('destinations/:destinationId/remote-files')
-  async listRemoteFiles(@Param('destinationId') destinationId: string) {
-    try {
-      this.logger.log('Received Requestbody in listRemoteFiles endpoint ', destinationId)
-      if (!destinationId) {
-        throw new BadRequestException('destinationId is required in params')
-      }
-      if (!DESTINATION_ID.includes(destinationId)) {
-        throw new BadRequestException('Destination id is invalid')
-      }
-      return await this.transferOutboundService.listRemoteFiles(destinationId)
-    } catch (error) {
-      this.logger.error(
-        'Error while listing the files from remote server',
-        error?.stack,
-        error?.message,
-      )
-      throw new HttpException(
-        {
-          status: RESPONSE_STATUS.FAILED,
-          statusCode: error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
-          message: error?.message,
-        },
-        error?.status || error?.code || HttpStatus.INTERNAL_SERVER_ERROR,
-      )
-    }
-  }
-
-  @Get('destinations/:destinationId/remote/inbound/files/:fileName')
-  async downloadRemoteFile(
+  @Get('transfers/:fileName')
+  @ApiOperation({ summary: 'Download a file' })
+  async downloadFile(
     @Param('destinationId') destinationId: string,
     @Param('fileName') fileName: string,
     @Res() res: Response,
   ) {
     try {
-      if (!destinationId || !fileName) {
-        throw new BadRequestException('destinationId and fileName are required')
-      }
-      const { filePath } = await this.transferOutboundService.downloadRemoteFile(
-        destinationId,
-        fileName,
-      )
+      this.validateDestinationId(destinationId)
+      this.validateFileName(fileName)
+      const { filePath } = await this.transferOutboundService.downloadFile(destinationId, fileName)
 
       const stream = fs.createReadStream(filePath)
       stream.pipe(res)
@@ -166,89 +186,35 @@ export class TransferOutboundController {
         await fs.promises.unlink(filePath)
       })
     } catch (error) {
-      this.logger.error('Error in downloadFile API', error?.stack, error?.message)
+      this.logger.error('Error downloading file', error?.stack, error?.message)
+      const statusCode = this.getHttpStatus(error)
       throw new HttpException(
         {
           status: RESPONSE_STATUS.FAILED,
-          statusCode: error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+          statusCode,
           message: error?.message || 'Download failed',
         },
-        error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+        statusCode,
       )
     }
   }
 
-  @Get('destinations/:destinationId/local/inbound/files/:fileName')
-  async downloadLocalFile(
-    @Param('destinationId') destinationId: string,
-    @Param('fileName') fileName: string,
-    @Res() res: Response,
-  ) {
-    try {
-      if (!destinationId || !fileName) {
-        throw new BadRequestException('destinationId and fileName are required')
-      }
-      const { filePath } = await this.transferOutboundService.downloadLocalFile(
-        destinationId,
-        fileName,
-      )
-
-      const stream = fs.createReadStream(filePath)
-      stream.pipe(res)
-      stream.on('close', async () => {
-        await fs.promises.unlink(filePath)
-      })
-    } catch (error) {
-      this.logger.error('Error in downloadLocalFile API', error?.stack, error?.message)
-      throw new HttpException(
-        {
-          status: RESPONSE_STATUS.FAILED,
-          statusCode: error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
-          message: error?.message || 'Download failed',
-        },
-        error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      )
-    }
-  }
-
-  @Get('destinations/:destinationId/health')
+  @Get('health')
+  @ApiOperation({ summary: 'Storage health check' })
   async storageHealthCheck(@Param('destinationId') destinationId: string) {
     try {
-      this.logger.log('Received destinationId in storage health check', destinationId)
+      this.validateDestinationId(destinationId)
       return this.transferOutboundService.storageHealthCheck()
     } catch (error) {
-      this.logger.error('Error in storage health check API', error?.stack, error?.message)
-      throw new HttpException(
-        {
-          status: RESPONSE_STATUS.UNHEALTHY,
-          statusCode: error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
-          message: error?.message || 'Storage is not reachable',
-        },
-        error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      )
-    }
-  }
-
-  @Get('destinations/:destinationId/local-files')
-  listAllLocalFiles(@Param('destinationId') destinationId: string) {
-    try {
-      if (!destinationId) {
-        throw new BadRequestException('destinationId is required')
-      }
-      if (!DESTINATION_ID.includes(destinationId)) {
-        throw new BadRequestException('Destination id is invalid')
-      }
-
-      return this.transferOutboundService.listAllLocalFiles(destinationId)
-    } catch (error) {
-      this.logger.error('Error in list All Local Files API', error?.stack, error?.message)
+      this.logger.error('Error in storage health check', error?.stack, error?.message)
+      const statusCode = this.getHttpStatus(error)
       throw new HttpException(
         {
           status: RESPONSE_STATUS.FAILED,
-          statusCode: error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
-          message: error?.message || 'Internal Server Error',
+          statusCode,
+          message: error?.message || 'Storage is not reachable',
         },
-        error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+        statusCode,
       )
     }
   }

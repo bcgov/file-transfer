@@ -23,7 +23,7 @@ export class S3ClientService {
   }
 
   private buildKey(destinationId: string, direction: string, fileName: string): string {
-    return `${this.prefix}${destinationId}/${direction}/${fileName}`
+    return `${this.prefix}${destinationId.toUpperCase()}/${direction}/${fileName}`
   }
 
   async uploadFile(destinationId: string, direction: string, fileName: string, buffer: Buffer) {
@@ -48,7 +48,7 @@ export class S3ClientService {
     destinationId: string,
     direction: string,
   ): Promise<{ name: string; size: number; lastModified: Date }[]> {
-    const prefix = `${this.prefix}${destinationId}/${direction}/`
+    const prefix = `${this.prefix}${destinationId.toUpperCase()}/${direction}/`
     this.logger.log(`Listing S3 objects with prefix: ${prefix}`)
 
     return new Promise((resolve, reject) => {
