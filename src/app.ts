@@ -28,9 +28,9 @@ export async function bootstrap() {
   })
   const config = new DocumentBuilder()
     .setTitle('File Transfer API')
-    .setDescription('Ftp File Transfer API documentation')
+    .setDescription('File Transfer API documentation')
     .setVersion('1.0')
-    .addTag('FTP')
+    .addTag('Transfers')
     .build()
 
   const document = SwaggerModule.createDocument(app, config)

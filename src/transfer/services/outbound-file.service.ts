@@ -1,34 +1,31 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
+import { Readable } from 'stream'
 import { spawn } from 'child_process'
-import { FtpClientService } from './ftp-client.service'
+import { S3ClientService } from './s3-client.service'
 import { COMMON_CONSTANT } from '../../common/common.constant'
 import { UploadFileInterface } from '../interfaces/outbound.interface'
 import { SERVER_CONFIG } from 'src/configs/server.config'
 
-const { LOCAL_STORAGE_DIR, INBOUND_DIR, OUTBOUND_DIR, CRA_PUB_CERT_PATH, CRA_PRIVATE_KEY_PATH } =
-  SERVER_CONFIG
+const { LOCAL_STORAGE_DIR, CRA_PUB_CERT_PATH, CRA_PRIVATE_KEY_PATH } = SERVER_CONFIG
 
 const { RESPONSE_STATUS, LOCAL_DIRECTORY } = COMMON_CONSTANT
 
 @Injectable()
-export class FtpOutboundService {
-  private readonly logger = new Logger(FtpOutboundService.name)
+export class TransferOutboundService {
+  private readonly logger = new Logger(TransferOutboundService.name)
 
-  constructor(private readonly ftpClientService: FtpClientService) {}
+  constructor(private readonly s3ClientService: S3ClientService) {}
 
-  async uploadFileToCra(request: UploadFileInterface) {
+  async uploadFile(request: UploadFileInterface) {
     const { file, destinationId, fileName } = request
     this.logger.log(
       `Received file in Outbound Service: ${file.originalname} as ${fileName} to destination ${destinationId}`,
     )
-    // encrypt file buffer in memory before saving to disk or uploading
-
     const tempDirPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.temp)
     const outboundDirPath = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.outbound)
 
-    // Ensure directories exist
     ;[tempDirPath, outboundDirPath].forEach((dir) => {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true })
@@ -36,43 +33,39 @@ export class FtpOutboundService {
     })
     const tempFilePath = path.join(tempDirPath, `${file.originalname}.p7m`)
 
-    // fs.mkdirSync(path.dirname(localFilePath), { recursive: true })
     const encryptedFileName = await this.encryptBuffer(file.buffer, tempFilePath)
     this.logger.log(`File: ${fileName} encrypted successfully`)
     const outboundFilePath = path.join(outboundDirPath, encryptedFileName)
-    // fs.writeFileSync(tempFilePath, file.buffer)
     if (fs.existsSync(outboundFilePath)) {
       this.logger.log(
         `File ${encryptedFileName} already uploaded to destination server, local outbound Path: ${outboundDirPath}, skipping upload.`,
       )
-      this.logger.log(`File: ${fileName} already uploded to the destination server`)
+      this.logger.log(`File: ${fileName} already uploaded to the destination server`)
       return {
         statusCode: 201,
         status: RESPONSE_STATUS.SUCCESS,
-        message: 'File already uploded to the destination server',
+        message: 'File already uploaded to the destination server',
         fileName: encryptedFileName,
         destinationId: destinationId,
       }
     }
 
-    const craFtpResponse = await this.ftpClientService.uploadFile(
-      tempFilePath,
-      OUTBOUND_DIR,
+    const encryptedBuffer = fs.readFileSync(tempFilePath)
+    await this.s3ClientService.uploadFile(
+      destinationId,
+      'OUTBOUND',
       encryptedFileName,
+      encryptedBuffer,
     )
-    this.logger.log(`CRA FTP Response: ${JSON.stringify(craFtpResponse)}`)
-    if (craFtpResponse?.code === 226) {
-      fs.renameSync(tempFilePath, path.join(outboundDirPath, encryptedFileName))
-      return {
-        statusCode: craFtpResponse?.code,
-        status: RESPONSE_STATUS.SUCCESS,
-        message: craFtpResponse?.message,
-        fileName: encryptedFileName,
-        destinationId: destinationId,
-      }
-    } else {
-      fs.unlinkSync(tempFilePath) // delete temp file on failure
-      throw new Error(`Failed to upload file to CRA FTP server: ${craFtpResponse?.message}`)
+    this.logger.log(`S3 upload complete for file: ${encryptedFileName}`)
+
+    fs.renameSync(tempFilePath, path.join(outboundDirPath, encryptedFileName))
+    return {
+      statusCode: 200,
+      status: RESPONSE_STATUS.SUCCESS,
+      message: 'File uploaded successfully to S3',
+      fileName: encryptedFileName,
+      destinationId: destinationId,
     }
   }
 
@@ -93,10 +86,14 @@ export class FtpOutboundService {
     if (fs.existsSync(localOutboundFilePath)) {
       localDeliveryStatus = true
     }
-    const isFileExistOnRemote = await this.ftpClientService.checkFileExist(OUTBOUND_DIR, fileName)
+    const isFileExistOnRemote = await this.s3ClientService.fileExists(
+      destinationId,
+      'OUTBOUND',
+      fileName,
+    )
 
     if (!isFileExistOnRemote) {
-      this.logger.log(`File ${fileName} Not  Exist on Remote`, isFileExistOnRemote)
+      this.logger.log(`File ${fileName} not found on remote`, isFileExistOnRemote)
       return {
         status: RESPONSE_STATUS.FAILED,
         statusCode: 404,
@@ -106,7 +103,7 @@ export class FtpOutboundService {
       }
     }
     if (fs.existsSync(localTepmFilePath)) {
-      this.logger.log(`File ${fileName} has been move from temp to sent Directory`)
+      this.logger.log(`File ${fileName} has been moved from temp to outbound directory`)
       fs.renameSync(localTepmFilePath, localOutboundFilePath)
     }
 
@@ -116,19 +113,19 @@ export class FtpOutboundService {
     return {
       status: RESPONSE_STATUS.SUCCESS,
       statusCode: 200,
-      message: 'File Delivered successfuly to the Destination',
+      message: 'File delivered successfully to the destination',
       local: localDeliveryStatus ? 'Delivered' : 'Not Delivered',
       remote: isFileExistOnRemote ? 'Delivered' : 'Not Delivered',
     }
   }
 
   async listRemoteFiles(destinationId: string) {
-    const files = await this.ftpClientService.listFiles(INBOUND_DIR)
+    const files = await this.s3ClientService.listFiles(destinationId, 'INBOUND')
     const result = files.map((eachFile) => {
       return {
-        fileName: eachFile?.name,
-        size: eachFile?.size,
-        lastModifiedAt: eachFile?.rawModifiedAt,
+        fileName: eachFile.name,
+        size: eachFile.size,
+        lastModifiedAt: eachFile.lastModified,
       }
     })
 
@@ -142,37 +139,25 @@ export class FtpOutboundService {
 
   async downloadRemoteFile(destinationId: string, fileName: string) {
     const localInboundDir = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.inbound)
-    const localInboundFilePath = `${localInboundDir}/${fileName}`
-    const remoteFilePath = `${INBOUND_DIR}/${fileName}`
+    const localInboundFilePath = path.join(localInboundDir, fileName)
 
     if (!fs.existsSync(localInboundDir)) {
-      fs.mkdirSync(localInboundDir)
+      fs.mkdirSync(localInboundDir, { recursive: true })
     }
 
-    const isFileDownloadable = await this.ftpClientService.downloadSingleFile(
-      remoteFilePath,
-      localInboundFilePath,
-    )
-
-    if (!isFileDownloadable) {
+    try {
+      const stream = await this.s3ClientService.downloadFile(destinationId, 'INBOUND', fileName)
+      await this.streamToFile(stream, localInboundFilePath)
+    } catch {
       throw new NotFoundException(`File not Found: ${fileName}`)
     }
 
-    // After download, verify it exists
-    if (!fs.existsSync(localInboundFilePath)) {
-      throw new NotFoundException(
-        `Downloaded file not found locally after FTP download: ${fileName}`,
-      )
-    }
     const decryptedFileName = fileName.replace(/\.p7m$/, '')
-
-    const decryptedFilePath = `${localInboundDir}/${decryptedFileName}`
+    const decryptedFilePath = path.join(localInboundDir, decryptedFileName)
 
     await this.decryptFile(localInboundFilePath, decryptedFilePath)
 
-    this.logger.log(
-      `The File ${fileName} downloded and stored at ${localInboundFilePath} & decrypted as ${decryptedFileName}`,
-    )
+    this.logger.log(`File ${fileName} downloaded and decrypted as ${decryptedFileName}`)
 
     return { filePath: decryptedFilePath, decryptedFileName: decryptedFileName }
   }
@@ -181,8 +166,8 @@ export class FtpOutboundService {
     this.logger.log(`Received Request for local file ${fileName} download`)
     const localInboundDir = path.join(LOCAL_STORAGE_DIR, destinationId, LOCAL_DIRECTORY.inbound)
     const decryptedFileName = fileName.replace(/\.p7m$/, '')
-    const localInboundFilePath = `${localInboundDir}/${fileName}`
-    const decryptedFilePath = `${localInboundDir}/${decryptedFileName}`
+    const localInboundFilePath = path.join(localInboundDir, fileName)
+    const decryptedFilePath = path.join(localInboundDir, decryptedFileName)
 
     if (!fs.existsSync(localInboundFilePath)) {
       throw new NotFoundException(`Downloaded file not found locally: ${fileName}`)
@@ -190,20 +175,20 @@ export class FtpOutboundService {
     await this.decryptFile(localInboundFilePath, decryptedFilePath)
     this.logger.log(`Local File ${fileName} Decrypted successfully`)
 
-    this.logger.log(`Local File ${fileName} Downloded successfully`)
+    this.logger.log(`Local file ${fileName} downloaded successfully`)
 
     return { filePath: decryptedFilePath, decryptedFileName: decryptedFileName }
   }
 
-  async ftpHealthCheck() {
-    const files = await this.ftpClientService.listFiles(INBOUND_DIR)
-    if (files?.length > 0) {
-      return { status: RESPONSE_STATUS.HEALTHY, statusCode: 200, message: 'Ftp Server is Healthy' }
+  async storageHealthCheck() {
+    const isHealthy = await this.s3ClientService.healthCheck()
+    if (isHealthy) {
+      return { status: RESPONSE_STATUS.HEALTHY, statusCode: 200, message: 'S3 storage is healthy' }
     } else {
       return {
         status: RESPONSE_STATUS.UNHEALTHY,
         statusCode: 503,
-        message: 'Ftp Server is not reachable',
+        message: 'S3 storage is not reachable',
       }
     }
   }
@@ -248,6 +233,15 @@ export class FtpOutboundService {
       .filter(Boolean)
   }
 
+  private streamToFile(stream: Readable, filePath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const writeStream = fs.createWriteStream(filePath)
+      stream.pipe(writeStream)
+      writeStream.on('finish', resolve)
+      writeStream.on('error', reject)
+    })
+  }
+
   private encryptBuffer(buffer: Buffer, outputPath: string): Promise<string> {
     this.logger.log(`Encrypting file buffer start & stored path: ${outputPath}`)
 
@@ -264,7 +258,6 @@ export class FtpOutboundService {
         CRA_PUB_CERT_PATH,
       ])
 
-      // Send buffer to OpenSSL stdin
       openssl.stdin.write(buffer)
       openssl.stdin.end()
 
@@ -282,7 +275,7 @@ export class FtpOutboundService {
     })
   }
 
-  private decryptFile(inputFilePath: string, outputFilePath: string) {
+  private decryptFile(inputFilePath: string, outputFilePath: string): Promise<string> {
     this.logger.log(
       `File Decrytion started inputfile: ${inputFilePath} outputFile: ${outputFilePath} private key: ${CRA_PRIVATE_KEY_PATH}`,
     )

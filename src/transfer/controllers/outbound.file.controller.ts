@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common'
 import fs from 'fs'
 import { Response } from 'express'
-import { FtpOutboundService } from '../services/outbound-file.service'
+import { TransferOutboundService } from '../services/outbound-file.service'
 import { CreateFileDto } from '../dto/outbound.file.dto'
 import { Logger } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
@@ -24,14 +24,14 @@ import { COMMON_CONSTANT } from '../../common/common.constant'
 
 const { DESTINATION_ID, RESPONSE_STATUS } = COMMON_CONSTANT
 
-@ApiTags('FTP')
+@ApiTags('Transfers')
 @Controller()
-export class FtpOutboundController {
-  private readonly logger = new Logger(FtpOutboundController.name)
-  constructor(private readonly FtpOutboundService: FtpOutboundService) {}
+export class TransferOutboundController {
+  private readonly logger = new Logger(TransferOutboundController.name)
+  constructor(private readonly transferOutboundService: TransferOutboundService) {}
 
   @Post('transfers')
-  @ApiOperation({ summary: 'Upload file to FTP Server' })
+  @ApiOperation({ summary: 'Upload file to storage' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Upload a .txt file only',
@@ -53,7 +53,7 @@ export class FtpOutboundController {
     type: OutboundUploadResponseDto,
   })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadfiletoCra(@UploadedFile() file: MulterFile, @Body() body: CreateFileDto) {
+  async uploadFile(@UploadedFile() file: MulterFile, @Body() body: CreateFileDto) {
     const { fileName, destinationId } = body
     this.logger.log(
       `Received file: ${file?.originalname}, destinationId: ${destinationId}, fileName: ${fileName}`,
@@ -70,9 +70,9 @@ export class FtpOutboundController {
         throw new BadRequestException(`destinationId is invalid use one of [${DESTINATION_ID}] it `)
       }
 
-      return await this.FtpOutboundService.uploadFileToCra({ file, destinationId, fileName })
+      return await this.transferOutboundService.uploadFile({ file, destinationId, fileName })
     } catch (error) {
-      this.logger.error('Error uploading file to CRA FTP', error?.stack, error?.message)
+      this.logger.error('Error uploading file', error?.stack, error?.message)
       throw new HttpException(
         {
           status: RESPONSE_STATUS.FAILED,
@@ -99,10 +99,10 @@ export class FtpOutboundController {
       if (!DESTINATION_ID.includes(destinationId)) {
         throw new BadRequestException('destinationId is invalid, Please use valid destinationId')
       }
-      return this.FtpOutboundService.checkFileDeliveryStatus(destinationId, fileName)
+      return this.transferOutboundService.checkFileDeliveryStatus(destinationId, fileName)
     } catch (error) {
       this.logger.error(
-        'Error while checking the delivery status of filefrom remote server',
+        'Error while checking the delivery status of file from remote server',
         error?.stack,
         error?.message,
       )
@@ -127,7 +127,7 @@ export class FtpOutboundController {
       if (!DESTINATION_ID.includes(destinationId)) {
         throw new BadRequestException('Destination id is invalid')
       }
-      return await this.FtpOutboundService.listRemoteFiles(destinationId)
+      return await this.transferOutboundService.listRemoteFiles(destinationId)
     } catch (error) {
       this.logger.error(
         'Error while listing the files from remote server',
@@ -155,20 +155,18 @@ export class FtpOutboundController {
       if (!destinationId || !fileName) {
         throw new BadRequestException('destinationId and fileName are required')
       }
-      const { filePath } = await this.FtpOutboundService.downloadRemoteFile(destinationId, fileName)
+      const { filePath } = await this.transferOutboundService.downloadRemoteFile(
+        destinationId,
+        fileName,
+      )
 
       const stream = fs.createReadStream(filePath)
-
       stream.pipe(res)
-
       stream.on('close', async () => {
         await fs.promises.unlink(filePath)
       })
-      // return res.download(filePath, decryptedFileName)
     } catch (error) {
       this.logger.error('Error in downloadFile API', error?.stack, error?.message)
-
-      // Keep your standard response structure
       throw new HttpException(
         {
           status: RESPONSE_STATUS.FAILED,
@@ -190,19 +188,18 @@ export class FtpOutboundController {
       if (!destinationId || !fileName) {
         throw new BadRequestException('destinationId and fileName are required')
       }
-      const { filePath } = await this.FtpOutboundService.downloadLocalFile(destinationId, fileName)
+      const { filePath } = await this.transferOutboundService.downloadLocalFile(
+        destinationId,
+        fileName,
+      )
 
       const stream = fs.createReadStream(filePath)
-
       stream.pipe(res)
-
       stream.on('close', async () => {
         await fs.promises.unlink(filePath)
       })
     } catch (error) {
       this.logger.error('Error in downloadLocalFile API', error?.stack, error?.message)
-
-      // Keep your standard response structure
       throw new HttpException(
         {
           status: RESPONSE_STATUS.FAILED,
@@ -215,19 +212,17 @@ export class FtpOutboundController {
   }
 
   @Get('destinations/:destinationId/health')
-  async ftpHealthCheck(@Param('destinationId') destinationId: string) {
+  async storageHealthCheck(@Param('destinationId') destinationId: string) {
     try {
-      this.logger.log('Received destinationId in ftp health check', destinationId)
-      return this.FtpOutboundService.ftpHealthCheck()
+      this.logger.log('Received destinationId in storage health check', destinationId)
+      return this.transferOutboundService.storageHealthCheck()
     } catch (error) {
-      this.logger.error('Error in ftp healthe check API', error?.stack, error?.message)
-
-      // Keep your standard response structure
+      this.logger.error('Error in storage health check API', error?.stack, error?.message)
       throw new HttpException(
         {
           status: RESPONSE_STATUS.UNHEALTHY,
           statusCode: error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
-          message: error?.message || 'FTP server is not reachable',
+          message: error?.message || 'Storage is not reachable',
         },
         error?.status || HttpStatus.INTERNAL_SERVER_ERROR,
       )
@@ -244,11 +239,9 @@ export class FtpOutboundController {
         throw new BadRequestException('Destination id is invalid')
       }
 
-      return this.FtpOutboundService.listAllLocalFiles(destinationId)
+      return this.transferOutboundService.listAllLocalFiles(destinationId)
     } catch (error) {
       this.logger.error('Error in list All Local Files API', error?.stack, error?.message)
-
-      // Keep your standard response structure
       throw new HttpException(
         {
           status: RESPONSE_STATUS.FAILED,

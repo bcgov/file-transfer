@@ -7,11 +7,11 @@ import { AppService } from './app.service'
 import { AppController } from './app.controller'
 import { MetricsController } from './metrics/metrics.controller'
 import { TerminusModule } from '@nestjs/terminus'
-import { FtpModule } from './ftp/ftp.module'
+import { TransferModule } from './transfer/transfer.module'
 import { HealthController } from './health/health.controller'
 
 @Module({
-  imports: [ConfigModule.forRoot(), TerminusModule, FtpModule],
+  imports: [ConfigModule.forRoot(), TerminusModule, TransferModule],
   controllers: [AppController, MetricsController, HealthController],
   providers: [AppService],
 })
