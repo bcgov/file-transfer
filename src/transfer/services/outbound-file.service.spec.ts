@@ -182,7 +182,6 @@ describe('TransferOutboundService', () => {
       expect(result.fileName).toBe('test.txt')
       expect(spawn).not.toHaveBeenCalled()
       expect(mockS3ClientService.uploadFile).toHaveBeenCalledWith(
-        'cra',
         'OUTBOUND',
         'test.txt',
         Buffer.from('file content'),
@@ -277,7 +276,7 @@ describe('TransferOutboundService', () => {
         size: 100,
         lastModifiedAt: new Date('2025-01-01'),
       })
-      expect(mockS3ClientService.listFiles).toHaveBeenCalledWith('cra', 'INBOUND')
+      expect(mockS3ClientService.listFiles).toHaveBeenCalledWith('INBOUND')
     })
 
     it('should throw when S3 errors', async () => {
@@ -319,7 +318,7 @@ describe('TransferOutboundService', () => {
 
       const result = await downloadPromise
 
-      expect(mockS3ClientService.downloadFile).toHaveBeenCalledWith('cra', 'INBOUND', 'report.csv')
+      expect(mockS3ClientService.downloadFile).toHaveBeenCalledWith('INBOUND', 'report.csv')
       expect(fs.renameSync).toHaveBeenCalled()
       expect(result.filePath).toContain('report.csv')
       expect(result.fileName).toBe('report.csv')

@@ -22,33 +22,28 @@ export class S3ClientService {
     this.prefix = S3_CONFIG.prefix
   }
 
-  private buildKey(destinationId: string, direction: string, fileName: string): string {
-    return `${this.prefix}${destinationId.toUpperCase()}/${direction}/${fileName}`
+  private buildKey(direction: string, fileName: string): string {
+    return `${this.prefix}${direction}/${fileName}`
   }
 
-  async uploadFile(destinationId: string, direction: string, fileName: string, buffer: Buffer) {
-    const key = this.buildKey(destinationId, direction, fileName)
+  async uploadFile(direction: string, fileName: string, buffer: Buffer) {
+    const key = this.buildKey(direction, fileName)
     this.logger.log(`Uploading to S3: ${key}`)
     const result = await this.client.putObject(this.bucket, key, buffer)
     this.logger.log(`Upload complete: ${key}`)
     return result
   }
 
-  async downloadFile(
-    destinationId: string,
-    direction: string,
-    fileName: string,
-  ): Promise<Readable> {
-    const key = this.buildKey(destinationId, direction, fileName)
+  async downloadFile(direction: string, fileName: string): Promise<Readable> {
+    const key = this.buildKey(direction, fileName)
     this.logger.log(`Downloading from S3: ${key}`)
     return await this.client.getObject(this.bucket, key)
   }
 
   async listFiles(
-    destinationId: string,
     direction: string,
   ): Promise<{ name: string; size: number; lastModified: Date }[]> {
-    const prefix = `${this.prefix}${destinationId.toUpperCase()}/${direction}/`
+    const prefix = `${this.prefix}${direction}/`
     this.logger.log(`Listing S3 objects with prefix: ${prefix}`)
 
     return new Promise((resolve, reject) => {
@@ -69,8 +64,8 @@ export class S3ClientService {
     })
   }
 
-  async fileExists(destinationId: string, direction: string, fileName: string): Promise<boolean> {
-    const key = this.buildKey(destinationId, direction, fileName)
+  async fileExists(direction: string, fileName: string): Promise<boolean> {
+    const key = this.buildKey(direction, fileName)
     try {
       await this.client.statObject(this.bucket, key)
       return true

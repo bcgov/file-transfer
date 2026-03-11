@@ -53,7 +53,7 @@ export class TransferOutboundService {
         }
       }
 
-      await this.s3ClientService.uploadFile(destinationId, 'OUTBOUND', uploadFileName, uploadBuffer)
+      await this.s3ClientService.uploadFile('OUTBOUND', uploadFileName, uploadBuffer)
       fs.renameSync(tempFilePath, path.join(outboundDirPath, uploadFileName))
     } else {
       uploadFileName = file.originalname
@@ -71,7 +71,7 @@ export class TransferOutboundService {
         }
       }
 
-      await this.s3ClientService.uploadFile(destinationId, 'OUTBOUND', uploadFileName, uploadBuffer)
+      await this.s3ClientService.uploadFile('OUTBOUND', uploadFileName, uploadBuffer)
       fs.writeFileSync(outboundFilePath, uploadBuffer)
     }
 
@@ -99,11 +99,7 @@ export class TransferOutboundService {
       fileName,
     )
 
-    const isFileOnRemote = await this.s3ClientService.fileExists(
-      destinationId,
-      'OUTBOUND',
-      fileName,
-    )
+    const isFileOnRemote = await this.s3ClientService.fileExists('OUTBOUND', fileName)
 
     if (
       !isFileOnRemote &&
@@ -135,7 +131,7 @@ export class TransferOutboundService {
   }
 
   async listInboundFiles(destinationId: string) {
-    const files = await this.s3ClientService.listFiles(destinationId, 'INBOUND')
+    const files = await this.s3ClientService.listFiles('INBOUND')
     return {
       status: RESPONSE_STATUS.SUCCESS,
       destinationId,
@@ -157,7 +153,7 @@ export class TransferOutboundService {
 
     const tmpPath = localFilePath + '.downloading'
     try {
-      const stream = await this.s3ClientService.downloadFile(destinationId, 'INBOUND', fileName)
+      const stream = await this.s3ClientService.downloadFile('INBOUND', fileName)
       await this.streamToFile(stream, tmpPath)
       fs.renameSync(tmpPath, localFilePath)
     } catch (error) {

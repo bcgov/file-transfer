@@ -44,7 +44,7 @@ describe('S3ClientService', () => {
       ;(mockMinioClient.putObject as any).mockResolvedValue({ etag: '123' })
 
       const buffer = Buffer.from('encrypted-content')
-      const result = await service.uploadFile('dest1', 'OUTBOUND', 'file.p7m', buffer)
+      const result = await service.uploadFile('OUTBOUND', 'file.p7m', buffer)
 
       expect(mockMinioClient.putObject).toHaveBeenCalledOnce()
       expect(result).toHaveProperty('etag')
@@ -56,7 +56,7 @@ describe('S3ClientService', () => {
       const mockStream = { pipe: vi.fn() }
       ;(mockMinioClient.getObject as any).mockResolvedValue(mockStream)
 
-      const result = await service.downloadFile('dest1', 'INBOUND', 'file.csv')
+      const result = await service.downloadFile('INBOUND', 'file.csv')
 
       expect(mockMinioClient.getObject).toHaveBeenCalledOnce()
       expect(result).toBe(mockStream)
@@ -69,12 +69,12 @@ describe('S3ClientService', () => {
         on: vi.fn((event, callback) => {
           if (event === 'data') {
             callback({
-              name: 'prefix/dest1/INBOUND/file1.csv',
+              name: 'test-prefix/INBOUND/file1.csv',
               size: 100,
               lastModified: new Date(),
             })
             callback({
-              name: 'prefix/dest1/INBOUND/file2.csv',
+              name: 'test-prefix/INBOUND/file2.csv',
               size: 200,
               lastModified: new Date(),
             })
@@ -87,7 +87,7 @@ describe('S3ClientService', () => {
       }
       ;(mockMinioClient.listObjects as any).mockReturnValue(mockStream)
 
-      const result = await service.listFiles('dest1', 'INBOUND')
+      const result = await service.listFiles('INBOUND')
 
       expect(mockMinioClient.listObjects).toHaveBeenCalledOnce()
       expect(result).toHaveLength(2)
@@ -98,7 +98,7 @@ describe('S3ClientService', () => {
     it('should return true when file exists', async () => {
       ;(mockMinioClient.statObject as any).mockResolvedValue({ size: 100 })
 
-      const result = await service.fileExists('dest1', 'OUTBOUND', 'file.p7m')
+      const result = await service.fileExists('OUTBOUND', 'file.p7m')
 
       expect(result).toBe(true)
     })
@@ -106,7 +106,7 @@ describe('S3ClientService', () => {
     it('should return false when file does not exist', async () => {
       ;(mockMinioClient.statObject as any).mockRejectedValue({ code: 'NotFound' })
 
-      const result = await service.fileExists('dest1', 'OUTBOUND', 'file.p7m')
+      const result = await service.fileExists('OUTBOUND', 'file.p7m')
 
       expect(result).toBe(false)
     })
